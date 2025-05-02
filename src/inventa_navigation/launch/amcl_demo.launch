@@ -1,0 +1,21 @@
+<launch>
+
+    <arg name="use_map_topic" default="false"/>
+    <arg name="scan_topic" default="front/scan" />  
+    <!-- <arg name="scan_topic" default="scan_multi" />   -->
+    
+    <!-- Map server -->
+    <!-- <arg name="map_file" default="$(find inventa_navigation)/maps/map1.yaml"/> -->
+    <arg name="map_file" default="/home/nsf24/inventa_sim/hospital.yaml"/>
+
+    <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" />
+  
+    <include file="$(find inventa_navigation)/launch/include/amcl.launch">
+      <arg name="use_map_topic" value="$(arg use_map_topic)" />
+      <arg name="scan_topic"    value="$(arg scan_topic)" />
+    </include>  
+
+    <!--- Run Move Base --> 
+    <include file="$(find inventa_navigation)/launch/include/move_base.launch"/>
+
+  </launch>

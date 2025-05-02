@@ -1,0 +1,25 @@
+<launch>
+    <!-- Load sequence parameters -->
+    <!-- <rosparam command="load" ns="move_base_seq"> -->
+        <!-- Coordinates are in meters relative to map frame -->
+        <!-- p_seq: [1.0, 1.0, 0.0,
+                2.0, 0.0, 0.0,
+                2.0, 2.0, 0.0,
+                0.0, 0.0, 0.0] -->
+        <!-- Yaw angles in degrees -->
+        <!-- yea_seq: [90, 0, -90, 0] -->
+
+        <!-- Start with just one nearby goal to test -->
+        <!-- p_seq: [0.5, 0.0, 0.0]   -->
+        <!-- Just 0.5 meters forward -->
+        <!-- yea_seq: [0]             -->
+        <!-- Keep same orientation -->
+
+    <!-- </rosparam> -->
+
+    <!-- Run the sequence node -->
+    <!-- Run the sequence node -->
+    <node pkg="inventa_navigation" type="move_bot_xy.py" name="move_base_sequence" output="screen" >
+        <param name="debug_mode" value="true"/>
+    </node>
+</launch>

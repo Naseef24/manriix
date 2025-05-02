@@ -1,0 +1,83 @@
+<launch>
+    <!-- Load PID gains from YAML file -->
+    <!-- <rosparam command="load" file="$(find inventa_project)/config/control/control.yaml" /> -->
+  
+  <!-- Start PID controllers for steering joints -->
+    <node name="front_left_steering_joint_pid" pkg="pid" type="controller" ns="front_left_steering_joint">
+      <param name="node_name" value="front_left_steering_joint_pid" />
+      <param name="topic_from_controller" value="control_effort" />
+      <param name="topic_from_plant" value="state" />
+      <param name="setpoint_topic" value="setpoint" />
+      <param name="pid_enable_topic" value="pid_enable" />
+    </node>
+    <node name="front_right_steering_joint_pid" pkg="pid" type="controller" ns="front_right_steering_joint">
+      <param name="node_name" value="front_right_steering_joint_pid" />
+      <param name="topic_from_controller" value="control_effort" />
+      <param name="topic_from_plant" value="state" />
+      <param name="setpoint_topic" value="setpoint" />
+      <param name="pid_enable_topic" value="pid_enable" />
+    </node>
+    <node name="rear_left_steering_joint_pid" pkg="pid" type="controller" ns="rear_left_steering_joint">
+      <param name="node_name" value="rear_left_steering_joint_pid" />
+      <param name="topic_from_controller" value="control_effort" />
+      <param name="topic_from_plant" value="state" />
+      <param name="setpoint_topic" value="setpoint" />
+      <param name="pid_enable_topic" value="pid_enable" />
+    </node>
+    <node name="rear_right_steering_joint_pid" pkg="pid" type="controller" ns="rear_right_steering_joint">
+      <param name="node_name" value="rear_right_steering_joint_pid" />
+      <param name="topic_from_controller" value="control_effort" />
+      <param name="topic_from_plant" value="state" />
+      <param name="setpoint_topic" value="setpoint" />
+      <param name="pid_enable_topic" value="pid_enable" />
+    </node>
+
+   <!-- Start PID controllers for wheel joints -->
+    <node name="ffl_wheel_joint_pid" pkg="pid" type="controller" ns="ffl_wheel_joint" output="screen" >
+      <param name="node_name" value="ffl_wheel_joint_pid" />
+      <param name="topic_from_controller" value="control_effort" />
+      <param name="topic_from_plant" value="state" />
+      <param name="setpoint_topic" value="setpoint" />
+      <remap from="pid_enable" to="pid_enable" />
+    </node>
+    <node name="ffr_wheel_joint_pid" pkg="pid" type="controller" ns="ffr_wheel_joint" output="screen" >
+      <param name="node_name" value="ffr_wheel_joint_pid" />
+      <param name="topic_from_controller" value="control_effort" />
+      <param name="topic_from_plant" value="state" />
+      <param name="setpoint_topic" value="setpoint" />
+      <remap from="pid_enable" to="pid_enable" />
+    </node>
+    <node name="rfl_wheel_joint_pid" pkg="pid" type="controller" ns="rfl_wheel_joint" output="screen" >
+      <param name="node_name" value="rfl_wheel_joint_pid" />
+      <param name="topic_from_controller" value="control_effort" />
+      <param name="topic_from_plant" value="state" />
+      <param name="setpoint_topic" value="setpoint" />
+      <remap from="pid_enable" to="pid_enable" />
+    </node>
+    <node name="rfr_wheel_joint_pid" pkg="pid" type="controller" ns="rfr_wheel_joint" output="screen" >
+      <param name="node_name" value="rfr_wheel_joint_pid" />
+      <param name="topic_from_controller" value="control_effort" />
+      <param name="topic_from_plant" value="state" />
+      <param name="setpoint_topic" value="setpoint" />
+      <remap from="pid_enable" to="pid_enable" />
+    </node>
+  
+    <!-- Add similar nodes for other joints you want to tune -->
+  
+    <node name="lidar_head_pid" pkg="pid" type="controller" ns="lidar_head_joint" output="screen" >
+      <param name="node_name" value="lidar_head_pid" />
+      <param name="topic_from_controller" value="control_effort" />
+      <param name="topic_from_plant" value="state" />
+      <param name="setpoint_topic" value="setpoint" />
+      <remap from="pid_enable" to="pid_enable" />
+    </node>
+  
+    <!-- Start rqt_reconfigure for real-time PID tuning -->
+    <node name="rqt_reconfigure" pkg="rqt_reconfigure" type="rqt_reconfigure" output="screen" />
+
+  <!-- Start the setpoint publisher -->
+  <node name="setpoint_publisher" pkg="inventa_project" type="setpoint_publisher.py" output="screen" />
+
+  <node name="joint_state_republisher" pkg="inventa_project" type="joint_state_republisher.py" output="screen"/>
+  
+  </launch>

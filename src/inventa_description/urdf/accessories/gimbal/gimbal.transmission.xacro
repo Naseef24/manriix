@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+    <xacro:macro name="transmission" params="name joint_name actuator_name">
+      
+      <transmission name="${name}" >
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name = "${joint_name}" >
+            <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="${actuator_name}" >
+            <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+    </transmission>
+
+      <!-- <transmission name="joint5_trans" >
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name = "joint5" >
+            <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="joint5_act" >
+            <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+      </transmission>
+
+      <transmission name="joint6_trans" >
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name = "joint6" >
+            <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="joint6_act" >
+            <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+      </transmission> 
+
+
+      <transmission name="joint7_trans" >
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name = "joint7" >
+            <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="joint7_act" >
+            <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+      </transmission> -->
+      
+  </xacro:macro>
+  
+</robot>

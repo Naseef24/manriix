@@ -1,0 +1,8 @@
+prefix=/home/nsf24/inventa_sim/install
+
+Name: inventa_description
+Description: Description of inventa_description
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

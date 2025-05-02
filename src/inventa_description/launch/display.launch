@@ -1,0 +1,33 @@
+<launch>
+  <arg
+    name="model" />
+
+  <!-- option-1 -->
+  <!-- <param
+    name="robot_description"
+    textfile="$(find inventa_description)/urdf/robot.urdf.xacro" /> -->
+
+  <!-- option-2 -->
+  <param
+    name="robot_description"
+    textfile="$(find inventa_description)/urdf/robot_v11.urdf.xacro" />
+
+  <!-- option-3
+  <param
+    name="robot_description"
+    textfile="$(find inventa_description)/urdf/inventa_scan.urdf.xacro" />   -->
+
+  <node
+    name="joint_state_publisher_gui"
+    pkg="joint_state_publisher_gui"
+    type="joint_state_publisher_gui" />
+  <node
+    name="robot_state_publisher"
+    pkg="robot_state_publisher"
+    type="robot_state_publisher" />
+  <node
+    name="rviz"
+    pkg="rviz"
+    type="rviz"
+    args="-d $(find inventa_description)/urdf.rviz" />
+</launch>

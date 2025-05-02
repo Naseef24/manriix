@@ -1,0 +1,96 @@
+#swervebot: # THIS IS A SPACE NAME 
+    # Publish all joint states -----------------------------------
+joint_state_controller:
+    type: "joint_state_controller/JointStateController"
+    publish_rate: 50
+
+# Controller for independent wheels --------------------------
+swerve_controller:
+    type: "swerve_controller/SwerveController"
+    
+    # Joints
+    lf_wheel: "ffl_wheel_joint"
+    rf_wheel: "ffr_wheel_joint"
+    lh_wheel: "rfl_wheel_joint"
+    rh_wheel: "rfr_wheel_joint"
+    lf_steering: "front_left_steering_joint"
+    rf_steering: "front_right_steering_joint"
+    lh_steering: "back_left_steering_joint"
+    rh_steering: "back_right_steering_joint"
+
+    # Range of motion of steering motors
+    min_steering_angle: -1.58 #-0.5238 #-0.7854 #-1.58
+    max_steering_angle: 1.58 #0.5238 #0.7854 #1.58
+
+    track: 0.75               # Distance between left and right wheels (75 cm)
+    wheel_steering_y_offset: 0.085  # Offset from wheel center to steering axis (8.5 cm)
+    wheel_radius: 0.101       # Wheel radius (keep current value if correct)
+    wheel_base: 0.365         # Distance between front and rear axles (36.5 cm)
+
+    # Other
+    publish_rate: 50
+    enable_odom_tf: false #true
+    pose_covariance_diagonal: [0.001, 0.001, 0.001, 0.001, 0.001, 0.03]
+    twist_covariance_diagonal: [0.001, 0.001, 0.001, 0.001, 0.001, 0.03]
+    cmd_vel_timeout: 5
+    base_frame_id: "base_footprint"
+
+    linear:
+        x:
+            has_velocity_limits    : true
+            max_velocity           : 2.0 #1.667  # m/s
+            min_velocity           : -2.0 #-1.667 # m/s
+            has_acceleration_limits: true
+            max_acceleration       : 15.0  # m/s^2
+            min_acceleration       : -15.0 # m/s^2
+            # has_velocity_limits: true
+            # max_velocity: 1.0 #4.0
+            # min_velocity: -1.0 #-2.0
+            # has_acceleration_limits: true
+            # max_acceleration: 1.0
+            # min_acceleration: -1.0   
+
+    angular:
+        z:
+            # has_velocity_limits    : true
+            # max_velocity           : 3.14  # rad/s
+            # min_velocity           : -3.14
+            # has_acceleration_limits: true
+            # max_acceleration       : 1.0  # rad/s^2
+            # min_acceleration       : -1.0
+            has_velocity_limits: true
+            max_velocity: 3.0 #1.0
+            min_velocity: -3.0 #-1.0
+            has_acceleration_limits: true
+            max_acceleration: 20.0
+            min_acceleration: -20.0  
+
+
+gimbal_arm_controller:
+  type: position_controllers/JointTrajectoryController
+  joints:
+    - joint_5
+    - joint_6
+    - joint_7
+    
+  stop_trajectory_duration: 0.5
+  state_publish_rate: 50
+  action_monitor_rate: 10
+        # Geometry (Do not provide the following if you want it to be parsed in the URDF)
+        #track: 0.99
+        #wheel_steering_y_offset: 0.0
+        #wheel_radius: 0.2           
+        #wheel_base: 1.02
+
+    # Low-Level Controllers -------------------------------------
+    # Values are not tunned
+    #gazebo_ros_control:
+    #    pid_gains:
+    #        steering_fl_joint: {p: 50.0, i: 1, d: 0.01}
+    #        steering_fr_joint: {p: 50.0, i: 1, d: 0.01}
+    #        steering_bl_joint: {p: 50.0, i: 1, d: 0.01}
+    #        steering_br_joint: {p: 50.0, i: 1, d: 0.01}
+    #        wheel_fl_joint: {p: 10.0, i: 1.0, d: 0.0}
+    #        wheel_fr_joint: {p: 10.0, i: 1.0, d: 0.0}
+    #        wheel_bl_joint: {p: 10.0, i: 1.0, d: 0.0}
+    #        wheel_br_joint: {p: 10.0, i: 1.0, d: 0.0}

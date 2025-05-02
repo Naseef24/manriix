@@ -1,0 +1,119 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="Unitree-L1">
+  <xacro:property name="M_PI" value="3.1415926535897931" />
+  <xacro:macro name="Unitree-L1" params="*origin parent:=base_link name:=unitree_lidar topic:=/unitree_lidar_l1/points hz:=11 lasers:=90 samples:=360 collision_range:=0.05 min_range:=0.5 max_range:=20.0 noise:=0.02 min_angle:=-${M_PI} max_angle:=${M_PI} gpu:=false">
+
+    <joint name="${name}_base_mount_joint" type="fixed">
+      <xacro:insert_block name="origin" /> 
+      <parent link="${parent}"/>
+      <child link="${name}_base_link"/>
+    </joint>
+
+    <link name="${name}_base_link">
+      <inertial>
+        <!-- <mass value="0.230"/> -->
+        <mass
+          value="0.23259702749081" />         
+        <!-- <origin xyz="0 0 0.0325"/> -->
+        <origin
+          xyz="0.171374004662087 -0.00179792944415741 -0.52905741418743"
+          rpy="0 0 0" />         
+        <!-- <inertia ixx="${(0.230 * (3.0*0.0375*0.0375 + 0.065*0.065)) / 12.0}" ixy="0" ixz="0"
+          iyy="${(0.230 * (3.0*0.0375*0.0375 + 0.065*0.065)) / 12.0}" iyz="0"
+          izz="${0.5 * 0.230 * (0.0375*0.0375)}"/> -->
+          <inertia
+            ixx="23.6620237808753"
+            ixy="0.0897839893092859"
+            ixz="0.164533996112027"
+            iyy="24.3606540377781"
+            iyz="0.0445918140451257"
+            izz="7.98401418474383" />
+      </inertial>
+      <visual>
+        <geometry>
+          <mesh filename="package://inventa_description/meshes/STL/Unitree 4D lidar.stl" scale="0.001 0.001 0.001" />
+        </geometry>
+        <!-- <material name="dark_grey">
+          <color rgba="0.1 0.1 0.1 1"/>
+        </material> -->
+        <material
+          name="">
+          <color
+            rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
+        </material>
+      </visual>
+      <collision>
+        <!-- <origin rpy="0 0 0" xyz="0 0 0.0325"/> -->
+        <origin
+          xyz="0 0 0"
+          rpy="0 0 0" />
+        <geometry>
+          <cylinder radius="0.0375" length="0.065"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="${name}_base_scan_joint" type="fixed" >
+      <!-- <origin xyz="0 0 0.0325" rpy="0 0 0" /> -->
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <parent link="${name}_base_link" />
+      <child link="${name}"/>
+    </joint>
+
+    <link name="${name}">
+      <inertial>
+        <mass value="0.001"/>
+        <origin xyz="0 0 0"/>
+        <inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7"/>
+      </inertial>
+    </link>
+
+    <gazebo reference="${name}">
+      <sensor type="ray" name="${name}-Unitree-L1">
+        <pose>0 0 0 0 0 0</pose>
+        <visualize>false</visualize>
+        <update_rate>${hz}</update_rate>
+        <ray>
+          <scan>
+            <horizontal>
+              <samples>${samples}</samples>
+              <resolution>1</resolution>
+              <min_angle>0</min_angle>
+              <max_angle>3.14</max_angle>
+              <!-- <min_angle>${min_angle}</min_angle>
+              <max_angle>${max_angle}</max_angle>               -->
+            </horizontal>
+            <vertical>
+              <samples>${lasers}</samples>
+              <resolution>1</resolution>
+              <!-- <min_angle>${min_angle}</min_angle>
+              <max_angle>${max_angle}</max_angle> -->
+              <min_angle>0</min_angle>
+              <max_angle>3.14</max_angle>              
+            </vertical>
+          </scan>
+          <range>
+            <min>${collision_range}</min>
+            <max>${max_range}</max>
+            <resolution>0.008</resolution>
+          </range>
+          <noise>
+            <type>gaussian</type>
+            <mean>0.0</mean>
+            <stddev>${noise}</stddev>
+          </noise>
+        </ray>
+        <plugin name="gazebo_ros_laser_controller" filename="libgazebo_ros_velodyne_laser.so">
+          <topicName>${topic}</topicName>
+          <frameName>${name}</frameName>
+          <min_range>${min_range}</min_range>
+          <max_range>${max_range}</max_range>
+          <gaussianNoise>${noise}</gaussianNoise>
+        </plugin>
+      </sensor>
+    </gazebo>
+
+  </xacro:macro>
+</robot>

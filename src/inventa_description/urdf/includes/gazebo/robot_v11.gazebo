@@ -1,0 +1,210 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <!-- Gazebo plugin for ROS Control -->
+  <gazebo>
+    <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
+      <robotNamespace>/</robotNamespace>
+      <robotSimType>gazebo_ros_control/DefaultRobotHWSim</robotSimType>
+      <legacyModeNS>true</legacyModeNS>
+      <controlPeriod>0.001</controlPeriod>
+    </plugin>
+  </gazebo>
+
+  <!-- Base Links -->
+  <gazebo reference="base_footprint">
+    <turnGravityOff>false</turnGravityOff>
+    <static>false</static>
+  </gazebo>
+
+  <gazebo reference="base_link">
+    <material>Gazebo/White</material>
+    <turnGravityOff>false</turnGravityOff>
+    <static>false</static>
+  </gazebo>
+
+  <!-- Gimbal Links -->
+  <gazebo reference="link_5">
+    <material>Gazebo/Grey</material>
+    <turnGravityOff>false</turnGravityOff>
+    <selfCollide>false</selfCollide>
+    <mu1>0.1</mu1>
+    <mu2>0.1</mu2>
+  </gazebo>
+
+  <gazebo reference="link_6">
+    <material>Gazebo/Red</material>
+    <turnGravityOff>false</turnGravityOff>
+    <selfCollide>false</selfCollide>
+    <mu1>0.1</mu1>
+    <mu2>0.1</mu2>
+  </gazebo>
+
+  <gazebo reference="link_7">
+    <material>Gazebo/Black</material>
+    <turnGravityOff>false</turnGravityOff>
+    <selfCollide>false</selfCollide>
+    <mu1>0.1</mu1>
+    <mu2>0.1</mu2>
+  </gazebo>
+
+<!-- ========================GAZEBO=================================================   -->
+<!-- ==========================Steering============================================== -->
+
+  <!-- Updated Gazebo properties for mid links -->
+  <gazebo reference="front_left_steering_link">
+    <material>Gazebo/Red</material>
+    <mu1>0.5</mu1>
+    <mu2>0.5</mu2>
+    <!-- <kp>10000000.0</kp>
+    <kd>1.0</kd> -->
+    <selfCollide>false</selfCollide>
+    <gravity>true</gravity>
+  </gazebo>
+
+  <gazebo reference="front_right_steering_link">
+    <material>Gazebo/Red</material>
+    <mu1>0.5</mu1>
+    <mu2>0.5</mu2>
+    <!-- <kp>10000000.0</kp>
+    <kd>1.0</kd> -->
+    <selfCollide>false</selfCollide>
+    <gravity>true</gravity>
+  </gazebo>
+
+  <gazebo reference="back_left_steering_link">
+    <material>Gazebo/Red</material>
+    <mu1>0.5</mu1>
+    <mu2>0.5</mu2>
+    <!-- <kp>10000000.0</kp>
+    <kd>1.0</kd> -->
+    <selfCollide>false</selfCollide>
+    <gravity>true</gravity>
+  </gazebo>
+
+  <gazebo reference="back_right_steering_link">
+    <material>Gazebo/Red</material>
+    <mu1>0.5</mu1>
+    <mu2>0.5</mu2>
+    <!-- <kp>10000000.0</kp>
+    <kd>1.0</kd> -->
+    <selfCollide>false</selfCollide>
+    <gravity>true</gravity>
+  </gazebo>
+
+<!-- ==========================Wheel========================================== -->
+  <!-- Updated Gazebo properties for wheel links -->
+  <gazebo reference="rfl_wheel_link">
+    <material>Gazebo/Black</material>
+    <!-- <mu1>1.5</mu1>
+    <mu2>1.5</mu2>
+    <kp>10000000.0</kp>
+    <kd>1.0</kd>
+    <fdir1>1 0 0</fdir1>
+    <maxVel>100.0</maxVel>
+    <minDepth>0.001</minDepth> -->
+    <mu1>0.8</mu1>
+    <mu2>0.8</mu2>
+    <kp>10000000.0</kp>
+    <kd>1.0</kd>
+    <minDepth>0.001</minDepth>
+    <maxVel>0.1</maxVel>
+    <fdir1>1 0 0</fdir1>    
+    <selfCollide>false</selfCollide>
+    <gravity>true</gravity>
+  </gazebo>
+
+
+  <gazebo reference="rfr_wheel_link">
+    <material>Gazebo/Black</material>
+    <!-- <mu1>1.5</mu1>
+    <mu2>1.5</mu2>
+    <kp>10000000.0</kp>
+    <kd>1.0</kd>
+    <fdir1>1 0 0</fdir1>
+    <maxVel>100.0</maxVel>
+    <minDepth>0.001</minDepth> -->
+    <mu1>0.8</mu1>
+    <mu2>0.8</mu2>
+    <kp>10000000.0</kp>
+    <kd>1.0</kd>
+    <minDepth>0.001</minDepth>
+    <maxVel>0.1</maxVel>
+    <fdir1>1 0 0</fdir1>  
+    <selfCollide>false</selfCollide>
+    <gravity>true</gravity>
+  </gazebo>
+
+  <gazebo reference="ffl_wheel_link">
+    <material>Gazebo/Black</material>
+    <!-- <mu1>1.5</mu1>
+    <mu2>1.5</mu2>
+    <kp>10000000.0</kp>
+    <kd>1.0</kd>
+    <fdir1>1 0 0</fdir1>
+    <maxVel>100.0</maxVel>
+    <minDepth>0.001</minDepth> -->
+    <mu1>0.8</mu1>
+    <mu2>0.8</mu2>
+    <kp>10000000.0</kp>
+    <kd>1.0</kd>
+    <minDepth>0.001</minDepth>
+    <maxVel>0.1</maxVel>
+    <fdir1>1 0 0</fdir1>  
+    <selfCollide>false</selfCollide>
+    <gravity>true</gravity>
+  </gazebo>
+
+  <gazebo reference="ffr_wheel_link">
+    <material>Gazebo/Black</material>
+    <!-- <mu1>1.5</mu1>
+    <mu2>1.5</mu2>
+    <kp>10000000.0</kp>
+    <kd>1.0</kd>
+    <fdir1>1 0 0</fdir1>
+    <maxVel>100.0</maxVel>
+    <minDepth>0.001</minDepth> -->
+    <mu1>0.8</mu1>
+    <mu2>0.8</mu2>
+    <kp>10000000.0</kp>
+    <kd>1.0</kd>
+    <minDepth>0.001</minDepth>
+    <maxVel>0.1</maxVel>
+    <fdir1>1 0 0</fdir1>  
+    <selfCollide>false</selfCollide>
+    <gravity>true</gravity>
+  </gazebo>
+  <!-- Sensors -->
+  <gazebo reference="imu_link">
+    <material>Gazebo/Yellow</material>
+  </gazebo>
+
+  <gazebo reference="mtk3339_link">
+    <material>Gazebo/Yellow</material>
+  </gazebo>
+
+  <gazebo reference="back_lt45_sonar_6_link">
+    <material>Gazebo/Purple</material>
+  </gazebo>
+
+  <gazebo reference="back_lt_sonar_5_link">
+    <material>Gazebo/Purple</material>
+  </gazebo>
+
+  <gazebo reference="front_lt45_sonar_4_link">
+    <material>Gazebo/Purple</material>
+  </gazebo>
+
+  <gazebo reference="front_sonar_3_link">
+    <material>Gazebo/Purple</material>
+  </gazebo>
+
+  <gazebo reference="front_rt45_sonar_2_link">
+    <material>Gazebo/Purple</material>
+  </gazebo>
+
+  <gazebo reference="back_rt_sonar_1_link">
+    <material>Gazebo/Purple</material>
+  </gazebo>
+
+</robot>

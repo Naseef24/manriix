@@ -1,0 +1,615 @@
+amcl:
+  # Alpha parameters for motion model
+  alpha1: 0.002
+  alpha2: 0.002
+  alpha3: 0.002
+  alpha4: 0.002
+  alpha5: 0.002
+  
+  # Frame IDs
+  base_frame_id: "base_footprint"
+  global_frame_id: "map"
+  odom_frame_id: "odom"
+  
+  # Beam parameters
+  beam_skip_distance: 0.5
+  beam_skip_error_threshold: 0.9
+  beam_skip_threshold: 0.3
+  do_beamskip: false
+  
+  # Initial pose
+  initial_pose_x: 0.0
+  initial_pose_y: 2.0
+  initial_pose_z: 0.25
+  initial_pose_a: 0.0
+  
+  # Laser parameters
+  lambda_short: 0.1
+  laser_likelihood_max_dist: 2.0
+  laser_max_range: 100.0
+  laser_min_range: -1.0
+  laser_model_type: "likelihood_field"
+  
+  # Particle filter parameters
+  max_beams: 60
+  max_particles: 2000
+  min_particles: 500
+  pf_err: 0.05
+  pf_z: 0.99
+  recovery_alpha_fast: 0.0
+  recovery_alpha_slow: 0.0
+  resample_interval: 1
+  
+  # Robot model
+  robot_model_type: "omnidirectional"  # Changed from differential to omnidirectional for 4WS
+  
+  # General parameters
+  save_pose_rate: 0.5
+  sigma_hit: 0.2
+  transform_tolerance: 1.0
+  update_min_a: 0.2
+  update_min_d: 0.25
+  
+  # Sensor model weights
+  z_hit: 0.5
+  z_max: 0.05
+  z_rand: 0.5
+  z_short: 0.05
+  
+  # Scan topic
+  scan_topic: scan
+  use_map_topic: true
+
+move_base:
+  # Global planner parameters
+  base_global_planner: "navfn/NavfnROS"
+  planner_frequency: 1.0
+  planner_patience: 5.0
+  
+  # Local planner parameters
+  base_local_planner: "teb_local_planner/TebLocalPlannerROS"  # Using TEB planner which supports 4WS
+  controller_frequency: 2.0
+  controller_patience: 5.0
+  
+  # Recovery behaviors
+  recovery_behaviors:
+    - name: conservative_reset
+      type: clear_costmap_recovery/ClearCostmapRecovery
+    - name: rotate_recovery
+      type: rotate_recovery/RotateRecovery
+    - name: aggressive_reset
+      type: clear_costmap_recovery/ClearCostmapRecovery
+  conservative_reset_dist: 0.5
+  
+  # Goal tolerance parameters
+  xy_goal_tolerance: 0.25
+  yaw_goal_tolerance: 3.14159
+  
+  # Frame IDs
+  global_frame: map
+  robot_base_frame: base_link
+  
+  # Timeouts
+  planner_frequency: 1.0
+  controller_frequency: 2.0
+  transform_tolerance: 1.0
+  
+  # Oscillation prevention
+  oscillation_timeout: 10.0
+  oscillation_distance: 0.2
+
+local_costmap:
+  # Update and publish frequencies
+  update_frequency: 5.0
+  publish_frequency: 2.0
+  
+  # Frame IDs
+  global_frame: odom
+  robot_base_frame: base_link
+  
+  # Map properties
+  rolling_window: true
+  width: 10
+  height: 10
+  resolution: 0.05
+  
+  # Robot size
+  footprint: [[-1.1, -0.8], [-1.1, 0.8], [1.1, 0.8], [1.1, -0.8]]  # Define custom footprint for 4WS
+  footprint_padding: 0.1
+  
+  # Layers and plugins
+  plugins:
+    - {name: obstacle_layer, type: "costmap_2d::ObstacleLayer"}
+    - {name: inflation_layer, type: "costmap_2d::InflationLayer"}
+  
+  obstacle_layer:
+    enabled: true
+    observation_sources: scan
+    scan:
+      topic: /scan
+      max_obstacle_height: 2.0
+      clearing: true
+      marking: true
+      data_type: "LaserScan"
+      raytrace_range: 10.0
+      obstacle_range: 9.5
+  
+  inflation_layer:
+    enabled: true
+    cost_scaling_factor: 3.0
+    inflation_radius: 0.55
+
+global_costmap:
+  # Update and publish frequencies
+  update_frequency: 1.0
+  publish_frequency: 1.0
+  
+  # Frame IDs
+  global_frame: map
+  robot_base_frame: base_link
+  
+  # Map properties
+  static_map: true
+  rolling_window: false
+  resolution: 0.05
+  
+  # Robot size
+  footprint: [[-1.1, -0.8], [-1.1, 0.8], [1.1, 0.8], [1.1, -0.8]]  # Same footprint as local costmap
+  footprint_padding: 0.1
+  
+  # Layers and plugins
+  plugins:
+    - {name: static_layer, type: "costmap_2d::StaticLayer"}
+    - {name: obstacle_layer, type: "costmap_2d::ObstacleLayer"}
+    - {name: inflation_layer, type: "costmap_2d::InflationLayer"}
+  
+  static_layer:
+    enabled: true
+    map_topic: /map
+  
+  obstacle_layer:
+    enabled: true
+    observation_sources: scan
+    scan:
+      topic: /scan
+      max_obstacle_height: 2.0
+      clearing: true
+      marking: true
+      data_type: "LaserScan"
+      raytrace_range: 10.0
+      obstacle_range: 9.5
+  
+  inflation_layer:
+    enabled: true
+    cost_scaling_factor: 3.0
+    inflation_radius: 0.55
+
+# TEB Local Planner parameters for four-wheel steering
+teb_local_planner:
+  odom_topic: odom
+  map_frame: map
+  
+  # Trajectory configuration
+  teb_autosize: true
+  dt_ref: 0.3
+  dt_hysteresis: 0.1
+  global_plan_overwrite_orientation: true
+  max_global_plan_lookahead_dist: 3.0
+  force_reinit_new_goal_dist: 1.0
+  feasibility_check_no_poses: 5
+  
+  # Robot configuration
+  max_vel_x: 0.5
+  max_vel_x_backwards: 0.2
+  max_vel_y: 0.2  # Allow lateral motion for 4WS
+  max_vel_theta: 0.5
+  acc_lim_x: 0.5
+  acc_lim_y: 0.2  # Lateral acceleration for 4WS
+  acc_lim_theta: 0.5
+  min_turning_radius: 0.0  # 0.0 means the robot can turn in place (4WS capability)
+  wheelbase: 1.0  # Distance between front and rear axles
+  cmd_angle_instead_rotvel: true  # Important for 4WS - command steering angle
+  
+  # Goal tolerance
+  xy_goal_tolerance: 0.2
+  yaw_goal_tolerance: 0.1
+  free_goal_vel: false
+  
+  # Obstacles
+  min_obstacle_dist: 0.5
+  include_costmap_obstacles: true
+  costmap_obstacles_behind_robot_dist: 1.0
+  obstacle_poses_affected: 30
+  inflation_dist: 0.6
+  
+  # Optimization
+  weight_max_vel_x: 2.0
+  weight_max_vel_y: 2.0
+  weight_max_vel_theta: 1.0
+  weight_acc_lim_x: 1.0
+  weight_acc_lim_y: 1.0
+  weight_acc_lim_theta: 1.0
+  weight_kinematics_nh: 1000.0
+  weight_kinematics_forward_drive: 1.0
+  weight_kinematics_turning_radius: 1.0
+  weight_optimaltime: 1.0
+  weight_obstacle: 50.0
+  
+  # Parallel motion (important for 4WS)
+  enable_homotopy_class_planning: true
+  enable_multithreading: true
+  simple_exploration: false
+  max_number_classes: 4
+  selection_cost_hysteresis: 1.0
+  selection_obst_cost_scale: 2.0
+  selection_alternative_time_cost: false
+  roadmap_graph_no_samples: 15
+  roadmap_graph_area_width: 5.0
+  h_signature_prescaler: 0.5
+  h_signature_threshold: 0.1
+  obstacle_heading_threshold: 0.45
+  switching_blocking_period: 0.0
+  
+  # Visualization
+  publish_feedback: false
+
+four_wheel_steering_controller:
+  type: "four_wheel_steering_controller/FourWheelSteeringController"
+  # Publish rate of the odometry
+  publish_rate: 50.0
+  
+  # Wheels names
+  front_left_wheel: front_left_wheel_joint
+  front_right_wheel: front_right_wheel_joint
+  rear_left_wheel: rear_left_wheel_joint
+  rear_right_wheel: rear_right_wheel_joint
+  
+  # Steering joints
+  front_left_steering: front_left_steering_joint
+  front_right_steering: front_right_steering_joint
+  rear_left_steering: rear_left_steering_joint
+  rear_right_steering: rear_right_steering_joint
+  
+  # Geometry
+  wheel_separation_width: 1.6  # Distance between left and right wheels
+  wheel_separation_length: 1.0  # Distance between front and rear wheels
+  wheel_radius: 0.3  # Wheel radius
+  steering_limit: 0.8  # Max steering angle in radians
+  
+  # Odometry
+  pose_covariance_diagonal: [0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
+  twist_covariance_diagonal: [0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
+  cmd_vel_timeout: 0.5
+  velocity_rolling_window_size: 10
+  
+  # Speed limits
+  linear:
+    x:
+      has_velocity_limits: true
+      max_velocity: 1.0
+      min_velocity: -0.5
+      has_acceleration_limits: true
+      max_acceleration: 0.8
+      min_acceleration: -0.4
+    y:
+      has_velocity_limits: true
+      max_velocity: 0.5
+      min_velocity: -0.5
+      has_acceleration_limits: true
+      max_acceleration: 0.4
+      min_acceleration: -0.4
+  angular:
+    z:
+      has_velocity_limits: true
+      max_velocity: 1.0
+      min_velocity: -1.0
+      has_acceleration_limits: true
+      max_acceleration: 0.6
+      min_acceleration: -0.6
+
+map_server:
+  # Map file
+  map_file: $(find your_package_name)/maps/map.yaml
+
+slam_toolbox:
+  # Plugin params
+  solver_plugin: solver_plugins::CeresSolver
+  ceres_linear_solver: SPARSE_NORMAL_CHOLESKY
+  ceres_preconditioner: SCHUR_JACOBI
+  ceres_trust_strategy: LEVENBERG_MARQUARDT
+  ceres_dogleg_type: TRADITIONAL_DOGLEG
+  ceres_loss_function: None
+  
+  # ROS Parameters
+  odom_frame: odom
+  map_frame: map
+  base_frame: base_footprint
+  scan_topic: /scan
+  mode: mapping
+  
+  # General Parameters
+  debug_logging: false
+  throttle_scans: 1
+  transform_publish_period: 0.02
+  map_update_interval: 5.0
+  resolution: 0.05
+  max_laser_range: 20.0
+  minimum_time_interval: 0.5
+  transform_timeout: 0.2
+  tf_buffer_duration: 30.0
+  
+  # Scan matching parameters
+  use_scan_matching: true
+  use_scan_barycenter: true
+  minimum_travel_distance: 0.5
+  minimum_travel_heading: 0.5
+  scan_buffer_size: 10
+  scan_buffer_maximum_scan_distance: 10.0
+  link_match_minimum_response_fine: 0.1
+  link_scan_maximum_distance: 1.5
+  loop_search_maximum_distance: 3.0
+  do_loop_closing: true
+  loop_match_minimum_chain_size: 10
+  loop_match_maximum_variance_coarse: 3.0
+  loop_match_minimum_response_coarse: 0.35
+  loop_match_minimum_response_fine: 0.45
+  
+  # Correlation Parameters
+  correlation_search_space_dimension: 0.5
+  correlation_search_space_resolution: 0.01
+  correlation_search_space_smear_deviation: 0.1
+  
+  # Loop Closure Parameters
+  loop_search_space_dimension: 8.0
+  loop_search_space_resolution: 0.05
+  loop_search_space_smear_deviation: 0.03
+  
+  # Scan Matcher Parameters
+  distance_variance_penalty: 0.5
+  angle_variance_penalty: 1.0
+  fine_search_angle_offset: 0.00349
+  coarse_search_angle_offset: 0.349
+  coarse_angle_resolution: 0.0349
+  minimum_angle_penalty: 0.9
+  minimum_distance_penalty: 0.5
+  use_response_expansion: true
+
+  amcl:
+  use_sim_time: true
+  alpha1: 0.002
+  alpha2: 0.002
+  alpha3: 0.002
+  alpha4: 0.002
+  alpha5: 0.002
+  base_frame_id: "base_footprint"
+  beam_skip_distance: 0.5
+  beam_skip_error_threshold: 0.9
+  beam_skip_threshold: 0.3
+  do_beamskip: false
+  global_frame_id: "map"
+  initial_pose_x: 0.0
+  initial_pose_y: 2.0
+  initial_pose_a: 0.25
+  initial_cov_xx: 0.0  # These were not in the original but are typical
+  initial_cov_yy: 0.0
+  initial_cov_aa: 0.0
+  lambda_short: 0.1
+  laser_likelihood_max_dist: 2.0
+  laser_max_range: 100.0
+  laser_min_range: -1.0
+  laser_model_type: "likelihood_field"
+  max_beams: 60
+  max_particles: 2000
+  min_particles: 500
+  odom_frame_id: "odom"
+  odom_model_type: "diff"  # Changed from "differential" to "diff"
+  pf_err: 0.05
+  pf_z: 0.99
+  recovery_alpha_fast: 0.0
+  recovery_alpha_slow: 0.0
+  resample_interval: 1
+  save_pose_rate: 0.5
+  use_map_topic: false  # Equivalent to set_initial_pose
+  initial_pose_a: 0.0  # Added as a conversion from the quaternion
+  sigma_hit: 0.2
+  tf_broadcast: true
+  transform_tolerance: 1.0
+  update_min_a: 0.2
+  update_min_d: 0.25
+  z_hit: 0.5
+  z_max: 0.05
+  z_rand: 0.5
+  z_short: 0.05
+  scan_topic: scan
+
+## Move Base Parameters
+move_base:
+  global_costmap:
+    update_frequency: 1.0
+    publish_frequency: 1.0
+    global_frame: map
+    robot_base_frame: base_link
+    use_sim_time: true
+    robot_radius: 0.85
+    resolution: 0.05
+    track_unknown_space: true
+    plugins:
+      - {name: static_layer, type: "costmap_2d::StaticLayer"}
+      - {name: obstacle_layer, type: "costmap_2d::ObstacleLayer"}
+      - {name: inflation_layer, type: "costmap_2d::InflationLayer"}
+    obstacle_layer:
+      enabled: true
+      observation_sources: scan
+      scan:
+        topic: /scan
+        max_obstacle_height: 2.0
+        clearing: true
+        marking: true
+        data_type: "LaserScan"
+        raytrace_max_range: 10.0
+        raytrace_min_range: 0.0
+        obstacle_max_range: 9.5
+        obstacle_min_range: 0.0
+    static_layer:
+      map_topic: /map
+      subscribe_to_updates: true
+    inflation_layer:
+      cost_scaling_factor: 3.0
+      inflation_radius: 0.55
+    always_send_full_costmap: true
+
+  local_costmap:
+    update_frequency: 5.0
+    publish_frequency: 2.0
+    global_frame: odom
+    robot_base_frame: base_link
+    use_sim_time: true
+    rolling_window: true
+    width: 10
+    height: 10
+    resolution: 0.05
+    robot_radius: 0.75
+    plugins:
+      - {name: obstacle_layer, type: "costmap_2d::VoxelLayer"}
+      - {name: inflation_layer, type: "costmap_2d::InflationLayer"}
+    inflation_layer:
+      cost_scaling_factor: 3.0
+      inflation_radius: 0.55
+    obstacle_layer:
+      enabled: true
+      publish_voxel_map: true
+      origin_z: 0.0
+      z_resolution: 0.05
+      z_voxels: 16
+      max_obstacle_height: 2.0
+      mark_threshold: 0
+      observation_sources: scan
+      scan:
+        topic: /scan
+        max_obstacle_height: 2.0
+        clearing: true
+        marking: true
+        data_type: "LaserScan"
+        raytrace_max_range: 10.0
+        raytrace_min_range: 0.0
+        obstacle_max_range: 9.5
+        obstacle_min_range: 0.0
+    always_send_full_costmap: true
+
+  # Base local planner parameters
+  base_local_planner: "dwa_local_planner/DWAPlannerROS"  # Using DWA planner for similar function
+  controller_frequency: 2.0
+  
+  # DWA Planner Parameters
+  DWAPlannerROS:
+    min_vel_x: 0.0
+    max_vel_x: 0.5  # Based on desired_linear_vel in ROS2 config
+    min_vel_y: 0.0
+    max_vel_y: 0.0  # Assuming differential drive robot
+    max_vel_theta: 1.8  # From rotate_to_heading_angular_vel
+    min_vel_theta: -1.8
+    acc_lim_x: 2.5  # From max_linear_accel
+    acc_lim_y: 0.0
+    acc_lim_theta: 3.2  # From max_angular_accel
+    
+    # Goal Tolerance Parameters
+    xy_goal_tolerance: 0.25
+    yaw_goal_tolerance: 3.14159
+    latch_xy_goal_tolerance: true
+    
+    # Forward Simulation Parameters
+    sim_time: 1.5  # From lookahead_time
+    sim_granularity: 0.025
+    vx_samples: 20
+    vy_samples: 0
+    vth_samples: 40
+    
+    # Trajectory Scoring Parameters
+    path_distance_bias: 32.0
+    goal_distance_bias: 24.0
+    occdist_scale: 0.01
+    twirling_scale: 0.0
+    stop_time_buffer: 0.2
+    oscillation_reset_dist: 0.05
+    oscillation_reset_angle: 0.2
+    
+    # Other Parameters
+    holonomic_robot: false
+    prune_plan: true
+    publish_traj_pc: true
+
+## Map Server Parameters
+map_server:
+  use_sim_time: true
+  frame_id: map
+
+## SLAM Toolbox Parameters
+slam_toolbox:
+  # Plugin params
+  solver_plugin: solver_plugins::CeresSolver
+  ceres_linear_solver: SPARSE_NORMAL_CHOLESKY
+  ceres_preconditioner: SCHUR_JACOBI
+  ceres_trust_strategy: LEVENBERG_MARQUARDT
+  ceres_dogleg_type: TRADITIONAL_DOGLEG
+  ceres_loss_function: None
+
+  # ROS Parameters
+  odom_frame: odom
+  map_frame: map
+  base_frame: base_footprint
+  scan_topic: /scan
+  mode: mapping
+
+  debug_logging: false
+  throttle_scans: 1
+  transform_publish_period: 0.02
+  map_update_interval: 5.0
+  resolution: 0.05
+  max_laser_range: 20.0
+  minimum_time_interval: 0.5
+  transform_timeout: 0.2
+  tf_buffer_duration: 30.0
+  stack_size_to_use: 40000000
+  enable_interactive_mode: true
+
+  # General Parameters
+  use_scan_matching: true
+  use_scan_barycenter: true
+  minimum_travel_distance: 0.5
+  minimum_travel_heading: 0.5
+  scan_buffer_size: 10
+  scan_buffer_maximum_scan_distance: 10.0
+  link_match_minimum_response_fine: 0.1  
+  link_scan_maximum_distance: 1.5
+  loop_search_maximum_distance: 3.0
+  do_loop_closing: true 
+  loop_match_minimum_chain_size: 10           
+  loop_match_maximum_variance_coarse: 3.0  
+  loop_match_minimum_response_coarse: 0.35    
+  loop_match_minimum_response_fine: 0.45
+
+  # Correlation Parameters - Correlation Parameters
+  correlation_search_space_dimension: 0.5
+  correlation_search_space_resolution: 0.01
+  correlation_search_space_smear_deviation: 0.1 
+
+  # Correlation Parameters - Loop Closure Parameters
+  loop_search_space_dimension: 8.0
+  loop_search_space_resolution: 0.05
+  loop_search_space_smear_deviation: 0.03
+
+  # Scan Matcher Parameters
+  distance_variance_penalty: 0.5      
+  angle_variance_penalty: 1.0    
+
+  fine_search_angle_offset: 0.00349     
+  coarse_search_angle_offset: 0.349   
+  coarse_angle_resolution: 0.0349        
+  minimum_angle_penalty: 0.9
+  minimum_distance_penalty: 0.5
+  use_response_expansion: true
+
+## Robot State Publisher
+robot_state_publisher:
+  use_sim_time: true
+  publish_frequency: 50.0

@@ -1,0 +1,16 @@
+[WARN] [1737093099.524409]: Failed to get robot position: "map" passed to lookupTransform argument target_frame does not exist. 
+[WARN] [1737093099.548257]: Could not get robot position
+[WARN] [1737093100.075381]: Failed to get robot position: "map" passed to lookupTransform argument target_frame does not exist. 
+[WARN] [1737093100.104654]: Could not get robot position
+[WARN] [1737093100.612067]: Failed to get robot position: "map" passed to lookupTransform argument target_frame does not exist. 
+[WARN] [1737093100.615240]: Could not get robot position
+[WARN] [1737093101.125551]: Failed to get robot position: "map" passed to lookupTransform argument target_frame does not exist. 
+[WARN] [1737093101.131822]: Could not get robot position
+[WARN] [1737093101.646702]: Failed to get robot position: "map" passed to lookupTransform argument target_frame does not exist. 
+[WARN] [1737093101.680293]: Could not get robot position
+[WARN] [1737093102.190887]: Failed to get robot position: "map" passed to lookupTransform argument target_frame does not exist. 
+[WARN] [1737093102.194028]: Could not get robot position
+[WARN] [1737093102.706856]: Failed to get robot position: "map" passed to lookupTransform argument target_frame does not exist. 
+[WARN] [1737093102.714073]: Could not get robot position
+^C[WARN] [1737093103.221160]: Failed to get robot position: "map" passed to lookupTransform argument target_frame does not exist. 
+[WARN] [1737093103.222982]: Could not get robot position

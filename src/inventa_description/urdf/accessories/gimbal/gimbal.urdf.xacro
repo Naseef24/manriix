@@ -1,0 +1,109 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <xacro:include filename="$(find inventa_description)/urdf/accessories/gimbal/base.gazebo.xacro"/>
+  <xacro:include filename="$(find inventa_description)/urdf/accessories/base/gimbal.transmission.xacro"/>
+
+  <xacro:macro name="gimbal_v0" params="parent *joint_origin">
+<!-- LINK-5 -->
+  <link  name="link5">
+    <inertial>
+      <origin  xyz="-0.096771 1.3767E-14 0.043265"  rpy="0 0 0" />
+      <mass  value="0.25" />
+      <inertia  ixx="0.00030603"  ixy="-1.4802E-20"  ixz="0.00045797"  iyy="0.0012791"  iyz="3.1473E-20"  izz="0.0010384" />
+    </inertial>
+
+    <visual>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/link5.STL" />
+      </geometry>
+      <material  name="">
+        <color  rgba="0.28627 0.66275 0.32941 1" />
+      </material>
+    </visual>
+
+    <collision>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/link5.STL" />
+      </geometry>
+    </collision>
+
+  </link>
+    
+  <joint  name="joint5"  type="revolute">
+    <origin  xyz="0.008 0 1.405"  rpy="0 0 ${M_PI}" />
+    <parent  link="base_link" />
+    <child  link="link5" />
+    <axis  xyz="0 0 1" />
+    <limit  lower="-3.14"  upper="-3.14"  effort="1000"  velocity="3.14" />
+  </joint>
+
+  <!-- LINK-6 -->
+  <link  name="link6">
+    <inertial>
+      <origin  xyz="0.077245 -0.083007 0.054087"  rpy="0 0 0" />
+      <mass  value="0.3" />
+      <inertia  ixx="0.0015318"  ixy="0.00083088"  ixz="-0.000835"  iyy="0.0018481"  iyz="0.00058179"  izz="0.0021396" />
+    </inertial>
+    <visual>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/link6.STL" />
+      </geometry>
+      <material  name="">
+        <color  rgba="0.69412 0.098039 0.098039 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/link6.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint  name="joint6"  type="revolute">
+    <origin  xyz="-0.14482 0 0.08758"  rpy="0 0 0" />
+    <parent  link="link5" />
+    <child  link="link6" />
+    <axis  xyz="-0.81915 0 -0.57358" />
+    <limit  lower="-0.785"  upper="0.785"  effort="1000"  velocity="3.14" />
+  </joint> 
+
+  <!-- LINK-7 -->  
+  <link  name="link7">
+    <inertial>
+      <origin  xyz="-0.0058531 0.10006 0.0072555"  rpy="0 0 0" />
+      <mass  value="2.0867" />
+      <inertia  ixx="0.004366"  ixy="-0.0011963"  ixz="-8.7865E-05"  iyy="0.012563"  iyz="-0.00016395"  izz="0.013393" />
+    </inertial>
+    <visual>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/link7.STL" />
+      </geometry>
+      <material  name="">
+        <color  rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/link7.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint  name="joint7"  type="revolute">
+    <origin  xyz="0.15625 -0.11228 0.10941"  rpy="0 0 0" />
+    <parent  link="link6" />
+    <child  link="link7" />
+    <axis  xyz="0 -1 0" />
+    <limit  lower="-0.785"  upper="0.785"  effort="1000"  velocity="3.14" />
+  </joint>
+
+</xacro:macro>
+  
+</robot>  

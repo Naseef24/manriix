@@ -1,0 +1,143 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+    <xacro:include filename="$(find inventa_description)/urdf/accessories/servo/servo.gazebo.xacro"/>
+    <xacro:include filename="$(find inventa_description)/urdf/accessories/servo/servo.transmission.xacro"/>
+    
+    <xacro:macro name="servo_v0" params="prefix parent *joint_origin *joint_axis">
+  
+<!-- ========================================SERVO-LINKS========================================================== -->
+  <!-- 1. FRONT-LEFT-SERVO -->
+  <link name="front_left_steering_link">
+    <inertial>
+      <origin  xyz="-3.5854E-12 7.9796E-12 -0.0049998"  rpy="0 0 0" />
+      <mass  value="0.002857" />
+      <inertia  ixx="1.0227E-07"  ixy="8.6872E-17"  ixz="-2.7953E-18"  iyy="1.0227E-07"  iyz="6.2158E-18"  izz="1.5698E-07" />
+    </inertial>
+    <visual>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/front_left_servo_link.STL" />
+      </geometry>
+      <material  name="">
+        <color  rgba="0.75294 0.75294 0.75294 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/front_left_servo_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="front_left_steering_joint" type="revolute">
+    <origin  xyz="0.194 0.21343 -0.065011"  rpy="0 0 0" />
+    <!-- <origin  xyz="0.2 0.2 -0.1"  rpy="0 0 0" /> -->
+    <parent  link="base_link" />
+    <child  link="front_left_steering_link" />
+    <!-- <axis  xyz="0 0 -1" /> -->
+    <axis  xyz="0 0 1" />
+    <limit  lower="-0.785"  upper="0.785"  effort="200"  velocity="3.14" />
+  </joint>
+
+  <!-- 2. FRONT-RIGHT-SERVO -->
+  <link name="front_right_steering_link">
+    <inertial>
+      <origin  xyz="-6.356E-14 8.7479E-12 -0.0049998"  rpy="0 0 0" />
+      <mass  value="0.002857" />
+      <inertia  ixx="1.0227E-07"  ixy="1.6845E-18"  ixz="-5.1681E-20"  iyy="1.0227E-07"  iyz="6.815E-18"  izz="1.5698E-07" />
+    </inertial>
+    <visual>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/front_right_servo_link.STL" />
+      </geometry>
+      <material  name="">
+        <color  rgba="0.75294 0.75294 0.75294 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/front_right_servo_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="front_right_steering_joint" type="revolute">
+    <origin  xyz="0.194 -0.21448 -0.06345"  rpy="0 0 0" />
+    <parent  link="base_link" />
+    <child  link="front_right_steering_link" />
+    <!-- <axis  xyz="0 0 -1" /> -->
+    <axis  xyz="0 0 1" />
+    <limit  lower="-0.785"  upper="0.785"  effort="200"  velocity="3.14" />
+  </joint>
+
+  <!-- 3. BACK-LEFT-SERVO-LINK -->
+  <link name="rear_left_steering_link">
+    <inertial>
+      <origin  xyz="-3.5854E-12 7.9796E-12 -0.0049998"  rpy="0 0 0" />
+      <mass  value="0.002857" />
+      <inertia  ixx="1.0227E-07"  ixy="8.687E-17"  ixz="-2.7951E-18"  iyy="1.0227E-07"  iyz="6.2159E-18"  izz="1.5698E-07" />
+    </inertial>
+    <visual>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/back_left_servo_link.STL" />
+      </geometry>
+      <material  name="">
+        <color  rgba="0.75294 0.75294 0.75294 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/back_left_servo_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint  name="rear_left_steering_joint"  type="revolute">
+    <origin  xyz="-0.194 0.21343 -0.065011"  rpy="0 0 0" />
+    <parent  link="base_link" />
+    <child  link="rear_left_steering_link" />
+    <!-- <axis  xyz="0 0 -1" /> -->
+    <axis  xyz="0 0 1" />
+    <limit  lower="-0.785"  upper="0.785"  effort="200"  velocity="3.14" />
+  </joint>
+
+  <!-- 4. BACK-RIGHT-SERVO-LINK -->
+  <link name="rear_right_steering_link">
+    <inertial>
+      <origin  xyz="-6.3505E-14 8.7479E-12 -0.0049998"  rpy="0 0 0" />
+      <mass  value="0.002857" />
+      <inertia  ixx="1.0227E-07"  ixy="1.6846E-18"  ixz="-5.1557E-20"  iyy="1.0227E-07"  iyz="6.815E-18"  izz="1.5698E-07" />
+    </inertial>
+    <visual>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/back_right_servo_link.STL" />
+      </geometry>
+      <material  name="">
+        <color  rgba="0.75294 0.75294 0.75294 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/back_right_servo_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint  name="rear_right_steering_joint"  type="revolute">
+    <origin  xyz="-0.194 -0.21448 -0.06345"  rpy="0 0 0" />
+    <parent  link="base_link" />
+    <child  link="rear_right_steering_link" />
+    <!-- <axis  xyz="0 0 -1" /> -->
+    <axis  xyz="0 0 1" />
+    <limit  lower="-0.785"  upper="0.785"  effort="200"  velocity="3.14" />
+  </joint> 
+
+</xacro:macro>    
+</robot>

@@ -1,0 +1,57 @@
+1.
+cd ~/inventa_sim/src
+mv inventa_gazebo inventa_gazebo_backup
+
+catkin_create_pkg inventa_gazebo roscpp gazebo_ros xacro std_msgs sensor_msgs urdf
+
+cp -r inventa_gazebo_backup/* inventa_gazebo/
+
+rm -r inventa_gazebo_backup
+
+
+2.
+
+mv inventa_control inventa_control_backup
+catkin_create_pkg inventa_control roscpp gazebo_ros xacro std_msgs sensor_msgs urdf
+cp -r inventa_control_backup/* inventa_control/
+rm -r inventa_control_backup
+
+
+3.
+
+mv inventa_description inventa_des_backup
+catkin_create_pkg inventa_description roscpp gazebo_ros xacro std_msgs sensor_msgs urdf
+cp -r inventa_des_backup/* inventa_description/
+rm -r inventa_des_backup
+
+
+4.
+
+mv inventa_dock inventa_dock_backup
+catkin_create_pkg inventa_dock roscpp gazebo_ros xacro std_msgs sensor_msgs urdf
+cp -r inventa_dock_backup/* inventa_dock/
+rm -r inventa_dock_backup
+
+
+5.
+mv inventa_msgs inventa_msgs_backup
+catkin_create_pkg inventa_msgs roscpp gazebo_ros xacro std_msgs sensor_msgs urdf
+cp -r inventa_msgs_backup/* inventa_msgs/
+rm -r inventa_msgs_backup
+
+
+6.
+mv inventa_navigation inventa_n_backup
+catkin_create_pkg inventa_navigation roscpp gazebo_ros xacro std_msgs sensor_msgs urdf
+cp -r inventa_n_backup/* inventa_navigation/
+rm -r inventa_n_backup
+
+
+7.
+mv inventa_viz inventa_viz_backup
+catkin_create_pkg inventa_viz roscpp gazebo_ros xacro std_msgs sensor_msgs urdf
+cp -r inventa_viz_backup/* inventa_viz/
+rm -r inventa_viz_backup
+
+cd ~/inventa_sim
+catkin_make -j4

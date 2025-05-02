@@ -1,0 +1,97 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <xacro:include filename="$(find inventa_description)/urdf/accessories/base/base.gazebo.xacro"/>
+  <xacro:include filename="$(find inventa_description)/urdf/accessories/gimbal/gimbal.transmission.xacro"/>
+
+  <xacro:macro name="base_v0" params="parent *joint_origin">
+
+<!-- ==============================1. Base-chassis================================================================= -->
+    <joint name="base_link_joint" type="fixed">
+      <xacro:insert_block name="joint_origin"/>
+      <parent link="${parent}"/>
+      <child link="base_link"/>
+    </joint>
+  <!-- 1. BASE -->
+
+  <link  name="base_link">
+    <inertial>
+      <origin  xyz="-0.00011179 -0.00023697 0.39351"  rpy="0 0 0" />
+      <mass  value="20.855" />
+      <inertia  ixx="0.22379"  ixy="3.0059E-07"  ixz="-1.4624E-05"  iyy="0.20975"  iyz="-8.1631E-07"  izz="0.2614" />
+    </inertial>
+    <visual>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/base_link.STL" />
+      </geometry>
+      <material  name="">
+        <color  rgba="1 0.94902 0.89804 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/base_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+<!-- Base gazebo -->
+    <!-- <xacro:base_gazebo_v0 prefix = "base"/>  -->
+
+<!-- Transmission tags gimbal  -->
+    <xacro:transmission name="trans_joint_5" 
+        joint_name="joint5" 
+        actuator_name="motor_joint_5" />
+    <xacro:transmission name="trans_joint_6" 
+        joint_name="joint6" 
+        actuator_name="motor_joint_6" /> 
+    <xacro:transmission name="trans_joint_7" 
+        joint_name="joint7" 
+        actuator_name="motor_joint_7" />
+
+<!-- ====================2. Servo-Links============================= -->
+  <xacro:include filename="$(find inventa_description)/urdf/accessories/servo/servo.gazebo.xacro"/>
+  <xacro:include filename="$(find inventa_description)/urdf/accessories/servo/servo.transmission.xacro"/>
+  <xacro:include filename="$(find inventa_description)/urdf/accessories/servo/servo.urdf.xacro"/>
+  <!-- Servos -->
+  <xacro:servo_gazebo_v0 prefix="front_right"/>
+  <xacro:servo_gazebo_v0 prefix="front_left"/>
+  <xacro:servo_gazebo_v0 prefix="rear_right"/>
+  <xacro:servo_gazebo_v0 prefix="rear_left"/>
+  <!-- Servo Transmission  -->
+  <xacro:servo_trans_v0 prefix="front_right"/>
+  <xacro:servo_trans_v0 prefix="front_left"/>
+  <xacro:servo_trans_v0 prefix="rear_right"/>
+  <xacro:servo_trans_v0 prefix="rear_left"/>
+
+<!-- ====================3. Sus-Links============================= -->
+  <xacro:include filename="$(find inventa_description)/urdf/accessories/suspension/suspension.gazebo.xacro"/>
+  <xacro:include filename="$(find inventa_description)/urdf/accessories/suspension/suspension.urdf.xacro"/>
+
+  <!-- Sus -->
+  <xacro:sus_gazebo_v0 prefix="front_right"/>
+  <xacro:sus_gazebo_v0 prefix="front_left"/>
+  <xacro:sus_gazebo_v0 prefix="rear_right"/>
+  <xacro:sus_gazebo_v0 prefix="rear_left"/>
+
+  <!-- ====================4. Wheel-Links============================= -->
+  <xacro:include filename="$(find inventa_description)/urdf/accessories/wheel/wheel.gazebo.xacro"/>
+  <xacro:include filename="$(find inventa_description)/urdf/accessories/wheel/wheel.transmission.xacro"/>
+  <xacro:include filename="$(find inventa_description)/urdf/accessories/wheel/wheel.urdf.xacro"/>
+
+  <!-- Wheel -->
+  <xacro:wheel_gazebo_v0 prefix="ffr"/>
+  <xacro:wheel_gazebo_v0 prefix="ffl"/>
+  <xacro:wheel_gazebo_v0 prefix="rfr"/>
+  <xacro:wheel_gazebo_v0 prefix="rfl"/>
+  <!--  Wheel Transmission  -->
+  <xacro:wheel_trans_v0 prefix="ffr"/>
+  <xacro:wheel_trans_v0 prefix="ffl"/>
+  <xacro:wheel_trans_v0 prefix="rfr"/>
+  <xacro:wheel_trans_v0 prefix="rfl"/>
+
+  </xacro:macro>
+  
+</robot>

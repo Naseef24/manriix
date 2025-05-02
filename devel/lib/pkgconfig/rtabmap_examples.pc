@@ -1,0 +1,8 @@
+prefix=/home/nsf24/inventa_sim/devel
+
+Name: rtabmap_examples
+Description: Description of rtabmap_examples
+Version: 0.21.9
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: roscpp rtabmap_conversions message_filters

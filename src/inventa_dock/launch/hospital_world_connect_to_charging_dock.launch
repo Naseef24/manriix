@@ -1,0 +1,136 @@
+<?xml version="1.0"?>
+<launch>
+
+  <!-- Launch Navigation to Charging Dock -->
+  <!-- <node pkg="two_wheeled_robot" type="navigate_to_charging_dock.py" name="navigate_to_charging_dock" output="screen"/> -->
+  <node pkg="inventa_dock" type="navigate_to_charging_dock.py" name="navigate_to_charging_dock" output="screen"/>
+
+  
+  <!-- Parameters and Arguments -->
+  <!-- <arg name="robot_name" default="two_wheeled_robot"/>
+  <arg name="use_sim_time" default="true"/>
+  <arg name="headless" default="false"/>
+  <arg name="use_rviz" default="true"/>
+  <arg name="use_robot_state_pub" default="true"/>
+  <arg name="use_simulator" default="true"/>
+  <arg name="slam" default="false" doc="Whether to run SLAM"/> -->
+
+  <!-- Path definitions -->
+  <!-- <arg name="map_file" default="$(find two_wheeled_robot)/maps/hospital_world/hospital_world.yaml"/>
+  <arg name="world_file" default="$(find two_wheeled_robot)/worlds/hospital.world"/>
+  <arg name="urdf_file" default="$(find two_wheeled_robot)/urdf/two_wheeled_robot.urdf"/>
+  <arg name="rviz_config" default="$(find two_wheeled_robot)/rviz/hospital_world/nav2_config.rviz"/>
+  <arg name="nav_config" default="$(find two_wheeled_robot)/params/hospital_world/nav1_connect_to_charging_dock_params.yaml"/> -->
+
+  <!-- Spawn position -->
+  <!-- <arg name="spawn_x" default="0.0"/>
+  <arg name="spawn_y" default="2.0"/>
+  <arg name="spawn_z" default="0.25"/>
+  <arg name="spawn_yaw" default="0.0"/> -->
+
+  <!-- Set up environment variables -->
+  <!-- <env name="GAZEBO_MODEL_PATH" value="$(find two_wheeled_robot)/models"/> -->
+
+  <!-- Use sim time parameter -->
+  <!-- <param name="/use_sim_time" value="$(arg use_sim_time)"/> -->
+
+  <!-- Start Gazebo with the specified world -->
+  <!-- <group if="$(arg use_simulator)">
+    <include file="$(find gazebo_ros)/launch/empty_world.launch">
+      <arg name="world_name" value="$(arg world_file)"/>
+      <arg name="paused" value="false"/>
+      <arg name="use_sim_time" value="$(arg use_sim_time)"/>
+      <arg name="gui" value="$(eval not arg('headless'))"/>
+      <arg name="headless" value="$(arg headless)"/>
+      <arg name="debug" value="false"/>
+    </include>
+  </group> -->
+
+  <!-- Spawn the robot in Gazebo -->
+  <!-- <node name="spawn_model" pkg="gazebo_ros" type="spawn_model" 
+    args="-urdf -param robot_description -model $(arg robot_name) 
+          -x $(arg spawn_x) -y $(arg spawn_y) -z $(arg spawn_z) -Y $(arg spawn_yaw)"
+    output="screen"/> -->
+
+  <!-- Load robot description from URDF -->
+  <!-- <param name="robot_description" command="xacro $(arg urdf_file)"/> -->
+
+  <!-- Robot State Publisher -->
+  <!-- <group if="$(arg use_robot_state_pub)">
+    <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
+      <param name="publish_frequency" type="double" value="30.0"/>
+    </node>
+  </group> -->
+
+  <!-- Start robot localization using an Extended Kalman filter -->
+  <!-- <node pkg="robot_localization" type="ekf_localization_node" name="ekf_filter_node" clear_params="true">
+    <rosparam command="load" file="$(find two_wheeled_robot)/config/ekf.yaml"/>
+    <param name="use_sim_time" value="$(arg use_sim_time)"/>
+  </node> -->
+
+  <!-- Load and run move_base -->
+  <!-- <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+    <rosparam command="load" file="$(arg nav_config)"/>
+    <param name="base_global_planner" value="navfn/NavfnROS"/>
+    <param name="base_local_planner" value="dwa_local_planner/DWAPlannerROS"/>
+    <remap from="cmd_vel" to="/cmd_vel"/>
+    <remap from="odom" to="/odometry/filtered"/>
+  </node> -->
+
+  <!-- Run map server -->
+  <!-- <group unless="$(arg slam)">
+    <node pkg="map_server" type="map_server" name="map_server" args="$(arg map_file)">
+      <param name="frame_id" value="map"/>
+    </node>
+  </group> -->
+
+  <!-- Run AMCL for localization -->
+  <!-- <group unless="$(arg slam)">
+    <include file="$(find amcl)/examples/amcl_diff.launch">
+      <arg name="use_map_topic" value="true"/>
+      <arg name="scan_topic" value="/scan"/>
+    </include>
+  </group> -->
+
+  <!-- Run SLAM if requested -->
+  <!-- <group if="$(arg slam)">
+    <node pkg="gmapping" type="slam_gmapping" name="slam_gmapping" output="screen">
+      <param name="base_frame" value="base_footprint"/>
+      <param name="odom_frame" value="odom"/>
+      <param name="map_update_interval" value="5.0"/>
+      <param name="maxUrange" value="16.0"/>
+      <param name="sigma" value="0.05"/>
+      <param name="kernelSize" value="1"/>
+      <param name="lstep" value="0.05"/>
+      <param name="astep" value="0.05"/>
+      <param name="iterations" value="5"/>
+      <param name="lsigma" value="0.075"/>
+      <param name="ogain" value="3.0"/>
+      <param name="lskip" value="0"/>
+      <param name="srr" value="0.1"/>
+      <param name="srt" value="0.2"/>
+      <param name="str" value="0.1"/>
+      <param name="stt" value="0.2"/>
+      <param name="linearUpdate" value="1.0"/>
+      <param name="angularUpdate" value="0.5"/>
+      <param name="temporalUpdate" value="3.0"/>
+      <param name="resampleThreshold" value="0.5"/>
+      <param name="particles" value="30"/>
+      <param name="xmin" value="-50.0"/>
+      <param name="ymin" value="-50.0"/>
+      <param name="xmax" value="50.0"/>
+      <param name="ymax" value="50.0"/>
+      <param name="delta" value="0.05"/>
+      <param name="llsamplerange" value="0.01"/>
+      <param name="llsamplestep" value="0.01"/>
+      <param name="lasamplerange" value="0.005"/>
+      <param name="lasamplestep" value="0.005"/>
+    </node>
+  </group> -->
+
+  <!-- Launch RViz -->
+  <!-- <group if="$(arg use_rviz)">
+    <node pkg="rviz" type="rviz" name="rviz" args="-d $(arg rviz_config)"/>
+  </group> -->
+
+</launch>

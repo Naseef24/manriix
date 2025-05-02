@@ -1,0 +1,37 @@
+digraph G {
+"front_left_steering_link" -> "ffl_wheel_link"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 40.201\nBuffer length: 4.975\nMost recent transform: 1737529938.22\nOldest transform: 1737529933.245\n"];
+"base_link" -> "front_left_steering_link"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 40.201\nBuffer length: 4.975\nMost recent transform: 1737529938.22\nOldest transform: 1737529933.245\n"];
+"front_right_steering_link" -> "ffr_wheel_link"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 40.201\nBuffer length: 4.975\nMost recent transform: 1737529938.22\nOldest transform: 1737529933.245\n"];
+"base_link" -> "front_right_steering_link"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 40.201\nBuffer length: 4.975\nMost recent transform: 1737529938.22\nOldest transform: 1737529933.245\n"];
+"base_footprint" -> "base_link"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"base_link" -> "link5"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 40.201\nBuffer length: 4.975\nMost recent transform: 1737529938.22\nOldest transform: 1737529933.245\n"];
+"link5" -> "link6"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 40.201\nBuffer length: 4.975\nMost recent transform: 1737529938.22\nOldest transform: 1737529933.245\n"];
+"link6" -> "link7"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 40.201\nBuffer length: 4.975\nMost recent transform: 1737529938.22\nOldest transform: 1737529933.245\n"];
+"link7" -> "link8"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 40.201\nBuffer length: 4.975\nMost recent transform: 1737529938.22\nOldest transform: 1737529933.245\n"];
+"base_link" -> "rear_left_steering_link"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 40.201\nBuffer length: 4.975\nMost recent transform: 1737529938.22\nOldest transform: 1737529933.245\n"];
+"base_link" -> "rear_right_steering_link"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 40.201\nBuffer length: 4.975\nMost recent transform: 1737529938.22\nOldest transform: 1737529933.245\n"];
+"rear_left_steering_link" -> "rfl_wheel_link"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 40.201\nBuffer length: 4.975\nMost recent transform: 1737529938.22\nOldest transform: 1737529933.245\n"];
+"rear_right_steering_link" -> "rfr_wheel_link"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 40.201\nBuffer length: 4.975\nMost recent transform: 1737529938.22\nOldest transform: 1737529933.245\n"];
+"camera_link" -> "camera_depth_frame"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"camera_bottom_screw_frame" -> "camera_link"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"camera_depth_frame" -> "camera_depth_optical_frame"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"camera_link" -> "camera_color_frame"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"camera_color_frame" -> "camera_color_optical_frame"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"camera_link" -> "camera_aligned_depth_to_color_frame"[label=" Broadcaster: /camera/realsense2_camera_manager\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"odom" -> "base_footprint"[label=" Broadcaster: /ekf_localization\nAverage rate: 50.201\nBuffer length: 4.96\nMost recent transform: 1737529938.228\nOldest transform: 1737529933.268\n"];
+"camera_link" -> "camera_infra1_frame"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"camera_infra1_frame" -> "camera_infra1_optical_frame"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"camera_link" -> "camera_infra2_frame"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"camera_infra2_frame" -> "camera_infra2_optical_frame"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"base_link" -> "camera_bottom_screw_frame"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"imu_link" -> "mtk3339_link"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"base_link" -> "imu_link"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"base_link" -> "laser"[label=" Broadcaster: /laser_broadcaster\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"base_link" -> "unilidar_lidar_base_link"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"unilidar_lidar_base_link" -> "unilidar_lidar"[label=" Broadcaster: /robot_state_publisher\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"map" -> "odom"[label=" Broadcaster: /slam_gmapping\nAverage rate: 20.202\nBuffer length: 4.95\nMost recent transform: 1737529938.271\nOldest transform: 1737529933.321\n"];
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 1737529938.2669246"[ shape=plaintext ] ;
+}->"map";
+}

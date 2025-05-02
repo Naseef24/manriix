@@ -1,0 +1,13 @@
+<!-- <?xml version="1.0" ?> -->
+<launch> 
+    <!-- <arg name="scan" default="front/scan" />  -->
+    <!-- Navigation Stuff (move_base)     -->
+    <!-- <include file="$(find inventa_navigation)/launch/include/rtab_move_base.launch" />       -->
+    <include file="$(find inventa_navigation)/launch/include/move_base.launch" />
+    
+    <!-- Mapping -->
+    <!-- <include file="$(find inventa_navigation)/launch/include/rtab_gmapping.launch" /> -->
+    <include file="$(find inventa_navigation)/launch/include/rtabmap_mapping.launch" />
+    <!-- <include file="$(find inventa_navigation)/launch/include/final_mapping.launch" /> -->
+       
+  </launch> 

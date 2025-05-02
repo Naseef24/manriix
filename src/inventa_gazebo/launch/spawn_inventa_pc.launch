@@ -1,0 +1,38 @@
+<launch>
+<!-- *** New lines -->
+  <arg name="x" default="1.0" />
+  <arg name="y" default="1.0" />
+
+  <!-- <arg name="x" default="0" />
+  <arg name="y" default="0" /> -->
+  <arg name="z" default="1" />
+  <!-- <arg name="z" default="0.15" /> -->
+
+  <arg name="roll" default="0"/>
+  <arg name="pitch" default="0"/>
+  <arg name="yaw" default="0.8" />
+  
+  <arg name="joystick" default="true" />
+
+  <!-- Configuration of Inventa which you would like to simulate.
+       See inventa_description for details. -->
+  <arg name="config" default="base" />
+
+  <!-- Load Inventa's description, controllers, and teleop nodes. -->
+  <include file="$(find inventa_description)/launch/description.launch">
+    <arg name="config" value="$(arg config)" />
+  </include>   
+
+  <!-- <include file="$(find inventa_control)/launch/control.launch" /> -->
+  <include file="$(find inventa_control)/launch/skid_control.launch" />
+
+  <include file="$(find inventa_control)/launch/teleop.launch">
+    <arg name="joystick" value="$(arg joystick)" />
+  </include>
+  
+  <!-- Spawn Inventa -->
+  <node name="urdf_spawner" 
+        pkg="gazebo_ros" 
+        type="spawn_model"
+	      args="-urdf -model inventa -param robot_description -x $(arg x) -y $(arg y) -z $(arg z) -R 0 -P 0 -Y $(arg yaw)" />
+</launch>

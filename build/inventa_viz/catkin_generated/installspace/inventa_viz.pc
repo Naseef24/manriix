@@ -1,0 +1,8 @@
+prefix=/home/nsf24/inventa_sim/install
+
+Name: inventa_viz
+Description: Description of inventa_viz
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

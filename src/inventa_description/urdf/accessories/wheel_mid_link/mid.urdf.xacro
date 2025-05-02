@@ -1,0 +1,136 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+	<xacro:include filename="$(find inventa_description)/urdf/accessories/wheel_mid_link/mid.gazebo.xacro"/>
+<!-- ================================================MIDDLE-LINKS======================================================  -->
+<link name="front_left_mid_link">
+    <inertial>
+      <origin  xyz="5.6807E-10 0.02165 -0.044032"  rpy="0 0 0" />
+      <mass  value="0.10135" />
+      <inertia  ixx="0.00010064"  ixy="2.4102E-13"  ixz="6.903E-16"  iyy="8.7535E-05"  iyz="2.4624E-06"  izz="4.2295E-05" />
+    </inertial>
+    <visual>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/front_left_steering_link.STL" />
+      </geometry>
+      <material  name="">
+        <color  rgba="0.52941 0.54902 0.54902 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/front_left_steering_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="front_left_mid_joint"  type="fixed">
+    <origin  xyz="0 0.0355 0"  rpy="0 0 0" />
+    <parent  link="front_left_steering_link" />
+    <child  link="front_left_mid_link" />
+    <axis  xyz="0 0 1" />
+    <limit  lower="-0.785"  upper="0.785"  effort="800"  velocity="0.785" />
+    <dynamics damping="0.7"/>
+  </joint>
+
+  <!-- FRONT-RIGHT-STEERING-LINK -->
+  <link  name="front_right_mid_link">
+    <inertial>
+      <origin  xyz="-5.698E-10 -0.02165 -0.044032"  rpy="0 0 0" />
+      <mass  value="0.10135" />
+      <inertia  ixx="0.00010064"  ixy="2.4E-13"  ixz="-8.9601E-16"  iyy="8.7535E-05"  iyz="-2.4624E-06"  izz="4.2295E-05" />
+    </inertial>
+    <visual>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/front_right_steering_link.STL" />
+      </geometry>
+      <material  name="">
+        <color  rgba="0.52941 0.54902 0.54902 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/front_right_steering_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  
+  <joint  name="front_right_mid_joint"  type="fixed">
+    <origin  xyz="0 -0.0355 0"  rpy="0 0 0" />
+    <parent  link="front_right_steering_link" />
+    <child  link="front_right_mid_link" />
+    <axis  xyz="0 0 1" />
+    <limit  lower="-0.785"  upper="0.785"  effort="800"  velocity="0.785" />
+    <dynamics damping="0.7"/>
+  </joint>
+
+  <!-- BACK-LEFT-STEERING-LINK -->
+  <link  name="rear_left_mid_link">
+    <inertial>
+      <origin  xyz="5.6795E-10 0.02165 -0.044032"  rpy="0 0 0" />
+      <mass  value="0.10135" />
+      <inertia  ixx="0.00010064"  ixy="2.4102E-13"  ixz="6.9029E-16"  iyy="8.7535E-05"  iyz="2.4624E-06"  izz="4.2295E-05" />
+    </inertial>
+    <visual>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/back_left_steering_link.STL" />
+      </geometry>
+      <material  name="">
+        <color  rgba="0.52941 0.54902 0.54902 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/back_left_steering_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  
+  <joint  name="rear_left_mid_joint"  type="fixed">
+    <origin  xyz="0 0.0355 0"  rpy="0 0 0" />
+    <parent  link="rear_left_steering_link" />
+    <child  link="rear_left_mid_link" />
+    <axis  xyz="0 0 1" />
+    <limit  lower="-0.785"  upper="0.785"  effort="800"  velocity="0.785" />
+    <dynamics damping="0.7"/>
+  </joint>
+
+  <!-- BACK-RIGHT-STEERING-LINK -->
+  <link  name="rear_right_mid_link">
+    <inertial>
+      <origin  xyz="-5.6973E-10 -0.02165 -0.044032"  rpy="0 0 0" />
+      <mass  value="0.10135" />
+      <inertia  ixx="0.00010064"  ixy="2.4E-13"  ixz="-8.96E-16"  iyy="8.7535E-05"  iyz="-2.4624E-06"  izz="4.2295E-05" />
+    </inertial>
+    <visual>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/back_right_steering_link.STL" />
+      </geometry>
+      <material  name="">
+        <color  rgba="0.52941 0.54902 0.54902 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/new/back_right_steering_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  
+  <joint  name="rear_right_mid_joint"  type="fixed">
+    <origin  xyz="0 -0.0355 0"  rpy="0 0 0" />
+    <parent  link="rear_right_steering_link" />
+    <child  link="rear_right_mid_link" />
+    <axis  xyz="0 0 1" />
+    <limit  lower="-0.785"  upper="0.785"  effort="800"  velocity="0.785" />
+    <dynamics damping="0.7"/>
+  </joint>
+
+</robot>

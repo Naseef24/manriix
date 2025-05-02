@@ -1,0 +1,1090 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This URDF was automatically created by SolidWorks to URDF Exporter! Originally created by Stephen Brawner (brawner@gmail.com) 
+     Commit Version: 1.6.0-4-g7f85cfe  Build Version: 1.6.7995.38578
+     For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
+<robot
+  name="BaseFrame">
+  <link
+    name="base_link">
+    <inertial>
+      <origin
+        xyz="0.00076508 -0.03487 0.043935"
+        rpy="0 0 0" />
+      <mass
+        value="46.319" />
+      <inertia
+        ixx="2.4979"
+        ixy="-0.0005861"
+        ixz="-0.025721"
+        iyy="2.6392"
+        iyz="-0.0041129"
+        izz="1.8999" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/base_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.68627 0.68627 0.68627 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/base_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <link
+    name="front_left_servo_link">
+    <inertial>
+      <origin
+        xyz="2.9455E-12 8.2375E-12 -0.0050002"
+        rpy="0 0 0" />
+      <mass
+        value="0.002857" />
+      <inertia
+        ixx="1.0227E-07"
+        ixy="-7.3674E-17"
+        ixz="-2.297E-18"
+        iyy="1.0227E-07"
+        iyz="-6.4167E-18"
+        izz="1.5698E-07" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/front_left_servo_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.75294 0.75294 0.75294 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/front_left_servo_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint
+    name="front_left_servo_joint"
+    type="continuous">
+    <origin
+      xyz="0.17449 0.23351 -0.36718"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="front_left_servo_link" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-0.785"
+      upper="0.785"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+
+  <link
+    name="front_left_steering_link">
+    <inertial>
+      <origin
+        xyz="-1.683E-08 0.018717 -0.061551"
+        rpy="0 0 0" />
+      <mass
+        value="0.095385" />
+      <inertia
+        ixx="6.9531E-05"
+        ixy="-2.5406E-11"
+        ixz="8.0633E-12"
+        iyy="6.5032E-05"
+        iyz="3.0924E-06"
+        izz="3.7514E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/front_left_steering_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/front_left_steering_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="front_left_steering_joint"
+    type="continuous">
+    <origin
+      xyz="0 0.035669 -0.00021967"
+      rpy="0 0 0" />
+    <parent
+      link="front_left_servo_link" />
+    <child
+      link="front_left_steering_link" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-0.785"
+      upper="0.785"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+  <link
+    name="ffl_wheel_link">
+    <inertial>
+      <origin
+        xyz="1.1283E-07 -0.031402 -7.6502E-09"
+        rpy="0 0 0" />
+      <mass
+        value="1.6937" />
+      <inertia
+        ixx="0.004084"
+        ixy="1.863E-09"
+        ixz="1.0596E-09"
+        iyy="0.007781"
+        iyz="-5.3178E-13"
+        izz="0.0040841" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/ffl_wheel_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/ffl_wheel_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ffl_wheel_joint"
+    type="continuous">
+    <origin
+      xyz="0 0.1102 -0.096517"
+      rpy="0 0 0" />
+    <parent
+      link="front_left_steering_link" />
+    <child
+      link="ffl_wheel_link" />
+    <axis
+      xyz="0 -1 0" />
+    <limit
+      lower="-3.14"
+      upper="3.14"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+
+  <link
+    name="front_right_servo_link">
+    <inertial>
+      <origin
+        xyz="-2.9454E-12 -8.2374E-12 -0.0050002"
+        rpy="0 0 0" />
+      <mass
+        value="0.002857" />
+      <inertia
+        ixx="1.0227E-07"
+        ixy="-7.3675E-17"
+        ixz="2.2969E-18"
+        iyy="1.0227E-07"
+        iyz="6.4168E-18"
+        izz="1.5698E-07" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/front_right_servo_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.75294 0.75294 0.75294 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/front_right_servo_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="front_right_servo_joint"
+    type="continuous">
+    <origin
+      xyz="0.17451 -0.23351 -0.36718"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="front_right_servo_link" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-0.785"
+      upper="0.785"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+
+  <link
+    name="front_right_steering_link">
+    <inertial>
+      <origin
+        xyz="1.683E-08 -0.018717 -0.061551"
+        rpy="0 0 0" />
+      <mass
+        value="0.095385" />
+      <inertia
+        ixx="6.9531E-05"
+        ixy="-2.5406E-11"
+        ixz="-8.0633E-12"
+        iyy="6.5032E-05"
+        iyz="-3.0924E-06"
+        izz="3.7514E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/front_right_steering_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/front_right_steering_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="front_right_steering_joint"
+    type="continuous">
+    <origin
+      xyz="0 -0.035669 -0.00021967"
+      rpy="0 0 0" />
+    <parent
+      link="front_right_servo_link" />
+    <child
+      link="front_right_steering_link" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-0.785"
+      upper="0.785"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+  <link
+    name="ffr_wheel_link">
+    <inertial>
+      <origin
+        xyz="-1.1283E-07 0.031402 -7.6524E-09"
+        rpy="0 0 0" />
+      <mass
+        value="1.6937" />
+      <inertia
+        ixx="0.004084"
+        ixy="1.863E-09"
+        ixz="-1.0596E-09"
+        iyy="0.007781"
+        iyz="5.1703E-13"
+        izz="0.0040841" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/ffr_wheel_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/ffr_wheel_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ffr_wheel_joint"
+    type="continuous">
+    <origin
+      xyz="0 -0.1102 -0.096517"
+      rpy="0 0 0" />
+    <parent
+      link="front_right_steering_link" />
+    <child
+      link="ffr_wheel_link" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-3.14"
+      upper="3.14"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+
+  <link
+    name="back_left_servo_link">
+    <inertial>
+      <origin
+        xyz="2.9455E-12 8.2505E-12 -0.0050002"
+        rpy="0 0 0" />
+      <mass
+        value="0.002857" />
+      <inertia
+        ixx="1.0227E-07"
+        ixy="-7.3675E-17"
+        ixz="-2.2969E-18"
+        iyy="1.0227E-07"
+        iyz="-6.4167E-18"
+        izz="1.5698E-07" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/back_left_servo_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.75294 0.75294 0.75294 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/back_left_servo_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint
+    name="back_left_servo_joint"
+    type="continuous">
+    <origin
+      xyz="-0.17451 0.23351 -0.36718"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="back_left_servo_link" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-0.785"
+      upper="0.785"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+
+  <link
+    name="back_left_steering_link">
+    <inertial>
+      <origin
+        xyz="-1.683E-08 0.018717 -0.061551"
+        rpy="0 0 0" />
+      <mass
+        value="0.095385" />
+      <inertia
+        ixx="6.9531E-05"
+        ixy="-2.5406E-11"
+        ixz="8.0633E-12"
+        iyy="6.5032E-05"
+        iyz="3.0924E-06"
+        izz="3.7514E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/back_left_steering_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/back_left_steering_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="back_left_steering_joint"
+    type="continuous">
+    <origin
+      xyz="0 0.035669 -0.00021967"
+      rpy="0 0 0" />
+    <parent
+      link="back_left_servo_link" />
+    <child
+      link="back_left_steering_link" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-0.785"
+      upper="0.785"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+  <link
+    name="rfl_wheel_link">
+    <inertial>
+      <origin
+        xyz="1.1283E-07 -0.031402 -7.6501E-09"
+        rpy="0 0 0" />
+      <mass
+        value="1.6937" />
+      <inertia
+        ixx="0.004084"
+        ixy="1.863E-09"
+        ixz="1.0596E-09"
+        iyy="0.007781"
+        iyz="-5.3032E-13"
+        izz="0.0040841" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/rfl_wheel_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/rfl_wheel_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="rfl_wheel_joint"
+    type="continuous">
+    <origin
+      xyz="0 0.1102 -0.096517"
+      rpy="0 0 0" />
+    <parent
+      link="back_left_steering_link" />
+    <child
+      link="rfl_wheel_link" />
+    <axis
+      xyz="0 -1 0" />
+    <limit
+      lower="-3.14"
+      upper="3.14"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+
+  <link
+    name="back_right_servo_link">
+    <inertial>
+      <origin
+        xyz="-2.9315E-12 -8.2416E-12 -0.0050002"
+        rpy="0 0 0" />
+      <mass
+        value="0.002857" />
+      <inertia
+        ixx="1.0227E-07"
+        ixy="-7.3675E-17"
+        ixz="2.2969E-18"
+        iyy="1.0227E-07"
+        iyz="6.4169E-18"
+        izz="1.5698E-07" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/back_right_servo_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.75294 0.75294 0.75294 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/back_right_servo_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint
+    name="back_right_servo_joint"
+    type="continuous">
+    <origin
+      xyz="-0.17449 -0.23351 -0.36718"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="back_right_servo_link" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-0.785"
+      upper="0.785"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+  
+  <link
+    name="back_right_steering_link">
+    <inertial>
+      <origin
+        xyz="1.683E-08 -0.018717 -0.061551"
+        rpy="0 0 0" />
+      <mass
+        value="0.095385" />
+      <inertia
+        ixx="6.9531E-05"
+        ixy="-2.5406E-11"
+        ixz="-8.0633E-12"
+        iyy="6.5032E-05"
+        iyz="-3.0924E-06"
+        izz="3.7514E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/back_right_steering_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/back_right_steering_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="back_right_steering_joint"
+    type="continuous">
+    <origin
+      xyz="0 -0.035669 -0.00021967"
+      rpy="0 0 0" />
+    <parent
+      link="back_right_servo_link" />
+    <child
+      link="back_right_steering_link" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-0.785"
+      upper="0.785"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+  <link
+    name="rfr_wheel_link">
+    <inertial>
+      <origin
+        xyz="-1.1282E-07 0.031402 -7.6517E-09"
+        rpy="0 0 0" />
+      <mass
+        value="1.6937" />
+      <inertia
+        ixx="0.004084"
+        ixy="1.863E-09"
+        ixz="-1.0597E-09"
+        iyy="0.007781"
+        iyz="5.1747E-13"
+        izz="0.0040841" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/rfr_wheel_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/rfr_wheel_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="rfr_wheel_joint"
+    type="continuous">
+    <origin
+      xyz="0 -0.1102 -0.096517"
+      rpy="0 0 0" />
+    <parent
+      link="back_right_steering_link" />
+    <child
+      link="rfr_wheel_link" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-3.14"
+      upper="3.14"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+
+  <link
+    name="link_5">
+    <inertial>
+      <origin
+        xyz="-0.070825 0.083174 0.12844"
+        rpy="0 0 0" />
+      <mass
+        value="4.1175" />
+      <inertia
+        ixx="0.10332"
+        ixy="-0.0001347"
+        ixz="0.0063858"
+        iyy="0.090643"
+        iyz="3.3746E-05"
+        izz="0.090854" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/link_5.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.28627 0.66275 0.32941 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/link_5.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="joint_5"
+    type="continuous">
+    <origin
+      xyz="0.0079992 -0.083161 0.81603"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="link_5" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-3.14"
+      upper="3.14"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+
+  <link
+    name="link_6">
+    <inertial>
+      <origin
+        xyz="0.077245 -0.083007 0.054087"
+        rpy="0 0 0" />
+      <mass
+        value="0.3" />
+      <inertia
+        ixx="0.0015318"
+        ixy="0.00083088"
+        ixz="-0.000835"
+        iyy="0.0018481"
+        iyz="0.00058179"
+        izz="0.0021396" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/link_6.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.69412 0.098039 0.098039 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/link_6.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="joint_6"
+    type="continuous">
+    <origin
+      xyz="-0.14482 0.083162 0.08758"
+      rpy="0 0 0" />
+    <parent
+      link="link_5" />
+    <child
+      link="link_6" />
+    <axis
+      xyz="-0.81915 0 -0.57358" />
+    <limit
+      lower="-0.785"
+      upper="0.785"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+
+  <link
+    name="link_7">
+    <inertial>
+      <origin
+        xyz="-0.0058531 0.10006 0.0072555"
+        rpy="0 0 0" />
+      <mass
+        value="2.0867" />
+      <inertia
+        ixx="0.004366"
+        ixy="-0.0011963"
+        ixz="-8.7865E-05"
+        iyy="0.012563"
+        iyz="-0.00016395"
+        izz="0.013393" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/link_7.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/link_7.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="joint_7"
+    type="continuous">
+    <origin
+      xyz="0.15625 -0.11228 0.10941"
+      rpy="0 0 0" />
+    <parent
+      link="link_6" />
+    <child
+      link="link_7" />
+    <axis
+      xyz="0 -1 0" />
+    <limit
+      lower="-0.785"
+      upper="0.785"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+  <link
+    name="rplidar_link">
+    <inertial>
+      <origin
+        xyz="-0.00056506 -1.4935E-05 0.014299"
+        rpy="0 0 0" />
+      <mass
+        value="0.16538" />
+      <inertia
+        ixx="7.8865E-05"
+        ixy="4.8473E-08"
+        ixz="2.1847E-06"
+        iyy="7.519E-05"
+        iyz="2.887E-08"
+        izz="0.00010995" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/rplidar_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/rplidar_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="rplidar_joint"
+    type="fixed">
+    <origin
+      xyz="0.332 0 -0.27344"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="rplidar_link" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="realsense_link">
+    <inertial>
+      <origin
+        xyz="-0.0011667 0.000187 0.0011705"
+        rpy="0 0 0" />
+      <mass
+        value="0.054864" />
+      <inertia
+        ixx="6.9174E-05"
+        ixy="-1.0126E-08"
+        ixz="-2.9076E-08"
+        iyy="4.1522E-06"
+        iyz="3.4836E-09"
+        izz="6.6016E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/realsense_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.75294 0.75294 0.75294 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/realsense_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="realsense_joint"
+    type="fixed">
+    <origin
+      xyz="0.2005 0 0.72354"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="realsense_link" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="unitree_4D_lidar_link">
+    <inertial>
+      <origin
+        xyz="-0.032289 -2.4591E-05 -6.1782E-05"
+        rpy="0 0 0" />
+      <mass
+        value="0.1152" />
+      <inertia
+        ixx="6.9752E-05"
+        ixy="-2.5163E-08"
+        ixz="-5.6487E-08"
+        iyy="4.8505E-05"
+        iyz="-5.0631E-06"
+        izz="3.8377E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/unitree_4D_lidar_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.75294 0.75294 0.75294 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://BaseFrame/meshes/unitree_4D_lidar_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="unitree_4D_lidar_joint"
+    type="fixed">
+    <origin
+      xyz="-0.177 0 0.70445"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="unitree_4D_lidar_link" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+</robot>

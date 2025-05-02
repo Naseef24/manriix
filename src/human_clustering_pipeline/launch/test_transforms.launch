@@ -1,0 +1,27 @@
+<launch>
+    <!-- Static transform publishers for testing -->
+    <!-- map -> odom -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="map_to_odom" 
+          args="0 0 0 0 0 0 map odom" />
+          
+    <!-- odom -> base_footprint -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="odom_to_base_footprint" 
+          args="0 0 0 0 0 0 odom base_footprint" />
+          
+    <!-- base_footprint -> base_link -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="base_footprint_to_base_link" 
+          args="0 0 0.1 0 0 0 base_footprint base_link" />
+          
+    <!-- base_link -> camera_link -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="base_to_camera" 
+          args="0.2 0 0.3 0 0 0 base_link camera_link" />
+
+    <!-- camera_link -> camera_color_optical_frame -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="camera_to_optical" 
+          args="0 0 0 -1.5708 0 -1.5708 camera_link camera_color_optical_frame" />
+          
+    <!-- Launch our node -->
+    <node name="human_clustering_node" pkg="human_clustering_pipeline" type="human_clustering_node_old.py" output="screen">
+        <param name="config_path" value="$(find human_clustering_pipeline)/config/config.yaml"/>
+    </node>
+</launch>

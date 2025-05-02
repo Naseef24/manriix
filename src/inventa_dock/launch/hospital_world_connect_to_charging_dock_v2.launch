@@ -1,0 +1,10 @@
+<launch>  
+  <!-- Launch map to base_link transform -->
+  <node pkg="inventa_dock" type="map_to_base_link_transform.py" name="map_to_base_link_transform"/>
+  <!-- <node pkg="inventa_dock" type="map_to_base_link_transform_test.py" name="map_to_base_link_transform"/> -->
+  
+  <!-- Launch navigation to the charging dock -->
+  <!-- <node pkg="two_wheeled_robot" type="navigate_to_charging_dock_v2.py" name="navigate_to_charging_dock"/> -->
+  <node pkg="inventa_dock" type="navigate_to_charging_dock_v2.py" name="navigate_to_charging_dock"/>
+  
+</launch>

@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- Static transforms for camera setup -->
+    <!-- Adjust these values based on your camera mounting position -->
+    <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="camera_to_base" 
+          args="0 0 1.5 0 0 0 base_link camera_link" />
+          
+    <node pkg="tf2_ros" type="static_transform_publisher" name="camera_link_to_optical" 
+          args="0 0 0 -1.57 0 -1.57 camera_link camera_optical_frame" /> -->
+          
+    <!-- Static transform for map (world) frame -->
+    <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="map_to_base" 
+          args="0 0 0 0 0 0 map base_link" /> -->
+
+    <!-- Launch the clustering node -->
+    <node pkg="human_clustering_pipeline" type="human_clustering_node.py" name="human_clustering_node" output="screen">
+        <param name="config_path" value="$(find human_clustering_pipeline)/config/config.yaml"/>
+    </node>
+</launch>

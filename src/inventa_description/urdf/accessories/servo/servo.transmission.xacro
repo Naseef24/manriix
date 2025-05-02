@@ -1,0 +1,62 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <xacro:macro name="servo_trans_v0" params="prefix">
+    <!-- <transmission name="${prefix}_servo_trans">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="${prefix}_steering_joint">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+        </joint>
+      <actuator name="${prefix}_servo_motor">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>0.4</mechanicalReduction>
+        </actuator>
+    </transmission> -->
+    <transmission name="front_left_steering_trans">
+      <type>transmission_interface/SimpleTransmission</type>
+      <joint name="front_left_steering_joint">
+        <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+      </joint>
+      <actuator name="front_left_servo_motor">
+        <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+        <mechanicalReduction>1</mechanicalReduction>
+      </actuator>
+    </transmission>  
+
+    <transmission name="front_right_steering_trans">
+      <type>transmission_interface/SimpleTransmission</type>
+      <joint name="front_right_steering_joint">
+        <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+      </joint>
+      <actuator name="front_right_servo_motor">
+        <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+        <mechanicalReduction>1</mechanicalReduction>
+      </actuator>
+    </transmission>
+
+    <transmission name="rear_left_steering_trans">
+      <type>transmission_interface/SimpleTransmission</type>
+      <joint name="rear_left_steering_joint">
+        <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+      </joint>
+      <actuator name="rear_left_servo_motor">
+        <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+        <mechanicalReduction>1</mechanicalReduction>
+      </actuator>
+    </transmission>
+
+
+	<transmission name="rear_right_steering_trans">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="rear_right_steering_joint">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="rear_right_servo_motor">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+  
+  </xacro:macro>
+
+</robot>

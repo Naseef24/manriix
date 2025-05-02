@@ -1,0 +1,57 @@
+<robot name="sensor_rplidar" xmlns:xacro="http://ros.org/wiki/xacro">
+<!-- <robot xmlns:xacro="http://ros.org/wiki/xacro"> -->
+	
+	<xacro:include filename="$(find inventa_description)/urdf/accessories/lidar/rplidar.gazebo.xacro"/>
+	
+	<!-- <xacro:macro name="rplidar" params="name topic_ns:=rplidar parent *origin visualize_laser:=true"> -->
+	<xacro:macro name="rplidar" params="name:=rplidar topic_ns:=/front/scan parent *origin visualize_laser:=true">
+
+		<!-- Joints and Links, standard URDF stuff -->
+		<joint name="${name}_joint" type="fixed">
+			<parent link="${parent}"/>
+			<child link="${name}_link"/>
+			<xacro:insert_block name="origin"/>
+		</joint>
+	
+		<link name="${name}_link">  
+			<visual>
+			  <origin xyz="0 0 0" rpy="1.57 0 1.57"/>
+			  <geometry>
+				<mesh filename="package://inventa_description/meshes/DAE/LIDAR/rplidar.dae" scale="0.001 0.001 0.001" />
+			  </geometry>  
+			  <!-- <material name="yellow"><color rgba="0.8 0.8 0.0 1.0" /></material>     -->
+			  <material
+				name="">
+				<color
+					rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+				</material>
+			</visual>
+			<collision>
+			  <origin xyz="0 0 0" rpy="0 0 0"/>
+			  <geometry>
+				<cylinder radius="0.0508" length="0.055"/>
+			  </geometry>
+			</collision>
+			<inertial>
+			  <!-- <mass value="0.190"/> -->
+			  <mass
+			  value="0.16538353203642" />
+			  <!-- <origin xyz="0 0 0" rpy="0 0 0"/> -->
+			  <origin
+			  xyz="-0.000565056922980089 -1.49350247278246E-05 0.0142986178892645"
+			  rpy="0 0 0" />
+			  <!-- <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/> -->
+			  <inertia
+			  ixx="7.88653130827605E-05"
+			  ixy="4.84727391749444E-08"
+			  ixz="2.18472968897183E-06"
+			  iyy="7.51902501485825E-05"
+			  iyz="2.88704831277006E-08"
+			  izz="0.000109946805568617" />
+			</inertial>
+		  </link>
+		  
+		<!-- rplidar plugin -->
+		<xacro:rplidar_gazebo name="${name}" reference="${name}_link" topic_ns="${topic_ns}" visualize_laser="${visualize_laser}"/>
+	</xacro:macro>
+</robot>

@@ -1,0 +1,158 @@
+  joint_state_controller:
+    type: joint_state_controller/JointStateController
+    publish_rate: 50 #40
+
+  four_wheel_steering_controller:
+    type        : "four_wheel_steering_controller/FourWheelSteeringController"
+    front_wheel: ['ffl_wheel_joint', 'ffr_wheel_joint']
+    rear_wheel: ['rfl_wheel_joint', 'rfr_wheel_joint']
+    front_steering: ['front_left_steering_joint', 'front_right_steering_joint']
+    rear_steering: ['rear_left_steering_joint', 'rear_right_steering_joint']
+    publish_rate: 50 #40.0
+
+    pose_covariance_diagonal : [0.01, 0.01, 1000000.0, 1000000.0, 1000000.0, 0.1]
+    twist_covariance_diagonal: [0.01, 0.01, 1000000.0, 1000000.0, 1000000.0, 0.1]
+    cmd_vel_timeout: 0.25 #25.0 not tested here default 0.5
+
+    # track_(0.0)
+    # wheel_steering_y_offset_(0.0)
+    # wheel_radius_(0.0)
+    # wheel_base_(0.0)
+
+    track: 0.75               # Distance between left and right wheels (75 cm)
+    wheel_steering_y_offset: 0.114 #0.085  # Offset from wheel center to steering axis (8.5 cm)
+    wheel_radius: 0.101       # Wheel radius (keep current value if correct)
+    wheel_base: 0.365         # Distance between front and rear axles (36.5 cm)
+
+  # Velocity rolling window for calculating acceleration/jerk
+    velocity_rolling_window_size: 10    
+
+   # Odometry fused with IMU is published by robot_localization, so
+   # no need to publish a TF based on encoders alone.
+    enable_odom_tf: false
+
+    # Base frame_id
+    base_frame_id: base_footprint #default: base_link  
+
+    # >>> Wheel separation and radius multipliers
+    # wheel_separation_multiplier: 1.0
+    # wheel_radius_multiplier    : 1.0
+
+    # Velocity commands timeout [s], default 0.5
+    # cmd_vel_timeout: 1.0
+
+   # Publish final output cmd_vel to /jackal_velocity_controller/cmd_vel_out
+    # publish_cmd: true
+
+    # k_l: 0.1
+    # k_r: 0.1
+    
+    # Velocity and acceleration limits
+    # Whenever a min_* is unspecified, default to -max_*
+    
+    linear:
+      x:
+        has_velocity_limits    : true
+        max_velocity           : 1.667  # m/s
+        min_velocity           : -1.667 # m/s
+        has_acceleration_limits: true
+        max_acceleration       : 3.0 #1.0  # m/s^2
+        min_acceleration       : -3.0 #-1.0 # m/s^2
+
+        # has_velocity_limits: true
+        # max_velocity: 1.0
+        # min_velocity: -1.0
+        # has_acceleration_limits: true
+        # max_acceleration: 1.0
+        # min_acceleration: -1.0    
+
+    angular:
+      z:
+        has_velocity_limits    : true
+        max_velocity           : 3.14  # rad/s
+        min_velocity           : -3.14
+        has_acceleration_limits: true
+        max_acceleration       : 1.0  # rad/s^2
+        min_acceleration       : -1.0
+        # has_velocity_limits: true
+        # max_velocity: 2.0
+        # min_velocity: -2.0
+        # has_acceleration_limits: true
+        # max_acceleration: 2.0
+        # min_acceleration: -2.0        
+
+    # /gazebo_ros_control:
+    #   pid_gains:
+    #     front_left_steering_joint:
+    #       p: 50
+    #       i: 1
+    #       d: 0.01
+    #     front_right_steering_joint:
+    #       p: 50
+    #       i: 1
+    #       d: 0.01
+    #     rear_left_steering_joint:
+    #       p: 50
+    #       i: 1
+    #       d: 0.01
+    #     rear_right_steering_joint:
+    #       p: 50
+    #       i: 1
+    #       d: 0.01
+
+          
+    #     ffl_wheel_joint: #front_left_wheel
+    #       p: 10.0
+    #       i: 1
+    #       d: 0.0
+    #     ffr_wheel_joint: #front_right_wheel
+    #       p: 10.0
+    #       i: 1
+    #       d: 0.0
+    #     rfl_wheel_joint: #rear_left_wheel
+    #       p: 10.0
+    #       i: 1
+    #       d: 0.0
+    #     rfr_wheel_joint: #rear_right_wheel
+    #       p: 10.0
+    #       i: 1
+    #       d: 0.0
+
+
+  gimbal_arm_controller:
+    type: position_controllers/JointTrajectoryController
+    joints:
+      - joint5
+      - joint6
+      - joint7
+      # - joint8
+      
+    stop_trajectory_duration: 0.5
+    state_publish_rate: 50
+    action_monitor_rate: 10
+
+    # PID gains for each joint
+    /gazebo_ros_control:    
+      gains:
+        joint5:
+          p: 100.0  # Proportional gain
+          i: 10.0   # Integral gain
+          d: 1.0    # Derivative gain
+        joint6:
+          p: 100.0
+          i: 10.0
+          d: 1.0
+        joint7:
+          p: 100.0
+          i: 10.0
+          d: 1.0
+        # joint8:  # Uncomment if needed
+        #   p: 100.0
+        #   i: 10.0
+        #   d: 1.0
+
+  # lidar_head_controller:
+  #   type: velocity_controllers/JointVelocityController
+  #   joint: lidar_head_joint
+  #   publish_rate: 50 #40
+  #   pid: {p: 10.0, i: 1.0, d: 0.0}

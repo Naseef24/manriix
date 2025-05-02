@@ -1,0 +1,55 @@
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz/TF
+      Enabled: true
+      Frame Timeout: 15
+      Frames:
+        All Enabled: true
+      Marker Scale: 1
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+      Tree:
+        {}
+      Update Interval: 0
+      Value: true
+
+    - Class: rviz/PointCloud2
+      Enabled: true
+      Name: LiDAR Points
+      Position Transformer: XYZ
+      Topic: /unitree_lidar_l1/points
+      Style: Points
+      Size (m): 0.01
+      Alpha: 1.0
+      Color: 255; 255; 255
+      Color Transformer: Intensity
+      Queue Size: 10
+      Selectable: true
+      Value: true
+
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /detected_humans
+      Name: Human Detections
+      Namespaces:
+        human_detections: true
+        human_labels: true
+      Queue Size: 100
+      Value: true
+
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: base_link
+    Frame Rate: 30
+
+  Views:
+    Current:
+      Class: rviz/Orbit
+      Distance: 10
+      Enable Stereo Rendering: false
+      Name: Current View
+      Target Frame: base_link
+      Value: Orbit (rviz)

@@ -1,0 +1,29 @@
+GlobalPlanner:
+  # Visualization
+  visualize_potential: true #false
+  
+  # Path Planning Parameters
+  allow_unknown: true #false                  # More cautious for heavy outdoor robot
+  default_tolerance: 0.4                # Larger tolerance for outdoor navigation
+  use_dijkstra: true                    # Use Dijkstra's algorithm (true) or A* (false)
+  use_quadratic: true                   # Use quadratic approximation of potential
+  use_grid_path: false                  # Create a path that follows grid boundaries
+  
+  # Optimization Parameters
+  old_navfn_behavior: false             # If true, use standard navfn behavior
+  lethal_cost: 253                      # Cost of hitting an obstacle
+  neutral_cost: 50                      # Cost of free space
+  cost_factor: 3.0                      # Scaling factor for path cost calculation
+  publish_potential: true               # Publish potential values as PointCloud2
+  
+  # Gradient Descent Parameters
+  orientation_mode: 1                   # 0: None, 1: Forward, 2: Interpolate, 3: ForwardThenInterpolate
+  orientation_window_size: 1            # Window size for orientation filter
+  
+  # Grid Parameters
+  outline_map: true                     # Add obstacles around the boundary of the map
+  
+  # Advanced Parameters (adjust with caution)
+  planner_window_x: 0.0                 # Window size in meters around robot's x position (0.0 = use costmap)
+  planner_window_y: 0.0                 # Window size in meters around robot's y position (0.0 = use costmap)
+  publish_scale: 100                    # Scale for publishing potential values

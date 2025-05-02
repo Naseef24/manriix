@@ -1,0 +1,1076 @@
+<?xml version="1.0"?>
+<robot name="inventa" xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <xacro:property name="M_PI" value="3.14159274"/>
+<!-- Rviz Color Properties -->
+  <xacro:include filename="$(find inventa_description)/urdf/includes/materials/materials.xacro" /> 
+
+<!-- 0. Base_footprint-->
+  <link name="base_footprint"/>
+
+  <joint name="base_link_joint" type="fixed">
+    <origin xyz="0 0 0.53" rpy="0 0 0" />
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+  </joint>
+  
+  <!-- 1. BASE -->
+
+  <link
+    name="base_link">
+    <inertial>
+      <origin
+        xyz="0.00076508 -0.03487 0.043935"
+        rpy="0 0 0" />
+      <mass
+        value="46.319" />
+      <inertia
+        ixx="2.4979"
+        ixy="-0.0005861"
+        ixz="-0.025721"
+        iyy="2.6392"
+        iyz="-0.0041129"
+        izz="1.8999" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/base_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.68627 0.68627 0.68627 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/base_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- LINK-5 -->
+  <link
+    name="link_5">
+    <inertial>
+      <origin
+        xyz="-0.070825 1.2682E-05 0.12344"
+        rpy="0 0 0" />
+      <mass
+        value="4.1175" />
+      <inertia
+        ixx="0.10332"
+        ixy="-0.0001347"
+        ixz="0.0063858"
+        iyy="0.090643"
+        iyz="3.3746E-05"
+        izz="0.090854" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/link_5.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/link_5.STL" />
+      </geometry>
+    </collision>
+
+  </link>
+    
+  <joint
+    name="joint_5"
+    type="continuous">
+    <origin
+      xyz="0.0079992 0 0.82103"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="link_5" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-3.14"
+      upper="3.14"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+
+  <transmission name="joint5_trans" >
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name = "joint_5" >
+        <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="joint5_act" >
+        <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+        <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+
+  <!-- LINK-6 -->
+  <link  name="link_6">
+    <inertial>
+      <origin  xyz="0.077245 -0.083007 0.054087"  rpy="0 0 0" />
+      <mass  value="0.3" />
+      <inertia  ixx="0.0015318"  ixy="0.00083088"  ixz="-0.000835"  iyy="0.0018481"  iyz="0.00058179"  izz="0.0021396" />
+    </inertial>
+    <visual>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/link_6.STL" />
+      </geometry>
+      <material  name="">
+        <color  rgba="0.69412 0.098039 0.098039 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin  xyz="0 0 0"  rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/link_6.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint  name="joint_6"  type="revolute">
+    <origin  xyz="-0.14482 0 0.08758"  rpy="0 0 0" />
+    <parent  link="link_5" />
+    <child  link="link_6" />
+    <axis  xyz="-0.81915 0 -0.57358" />
+    <limit  lower="-0.785"  upper="0.785"  effort="1000"  velocity="3.14" />
+  </joint>
+
+  <transmission name="joint6_trans" >
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name = "joint_6" >
+        <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="joint_6_act" >
+        <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+        <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>  
+
+  <!-- LINK-6
+  <link
+    name="link_6">
+    <inertial>
+      <origin
+        xyz="0.077245 -0.083007 0.054087"
+        rpy="0 0 0" />
+      <mass
+        value="0.3" />
+      <inertia
+        ixx="0.0015318"
+        ixy="0.00083088"
+        ixz="-0.000835"
+        iyy="0.0018481"
+        iyz="0.00058179"
+        izz="0.0021396" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/link_6.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.69412 0.098039 0.098039 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/link_6.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint
+    name="joint_6"
+    type="revolute">
+    <origin
+      xyz="-0.14482 0.083162 0.08758"
+      rpy="0 0 0" />
+    <parent
+      link="link_5" />
+    <child
+      link="link_6" />
+    <axis
+      xyz="-0.81915 0 -0.57358" />
+    <limit
+      lower="-0.785"
+      upper="0.785"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+
+  <transmission name="joint6_trans" >
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name = "joint_6" >
+        <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="joint6_act" >
+        <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+        <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>   -->
+
+  <!-- LINK-7 -->  
+  <link
+    name="link_7">
+    <inertial>
+      <origin
+        xyz="-0.0058531 0.10006 0.0072555"
+        rpy="0 0 0" />
+      <mass
+        value="2.0867" />
+      <inertia
+        ixx="0.004366"
+        ixy="-0.0011963"
+        ixz="-8.7865E-05"
+        iyy="0.012563"
+        iyz="-0.00016395"
+        izz="0.013393" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/link_7.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/link_7.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint
+    name="joint_7"
+    type="revolute">
+    <origin
+      xyz="0.15625 -0.11228 0.10941"
+      rpy="0 0 0" />
+    <parent
+      link="link_6" />
+    <child
+      link="link_7" />
+    <axis
+      xyz="0 -1 0" />
+    <limit
+      lower="-0.784"
+      upper="0.784"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+
+  <transmission name="joint7_trans" >
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name = "joint_7" >
+        <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="joint7_act" >
+        <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+        <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+
+<!-- ================================================STEERING-LINKS======================================================  -->
+  <link
+    name="front_left_steering_link">
+    <inertial>
+      <origin
+        xyz="-1.577E-08 0.017772 -0.063317"
+        rpy="0 0 0" />
+      <mass
+        value="0.10046" />
+      <inertia
+        ixx="7.3884E-05"
+        ixy="-2.5406E-11"
+        ixz="8.0633E-12"
+        iyy="6.9386E-05"
+        iyz="3.0924E-06"
+        izz="3.7554E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/front_left_steering_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/front_left_steering_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint
+    name="front_left_steering_joint"
+    type="revolute">
+    <origin
+      xyz="0.1745 0.26918 -0.3674"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="front_left_steering_link" />
+    <!-- <axis
+      xyz="0 0 -1" /> -->
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-0.784"
+      upper="0.784"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+
+ <transmission name="front_left_servo_trans">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="front_left_steering_joint">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="front_left_servo_motor">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>  
+
+
+  <!-- FRONT-RIGHT-STEERING-LINK -->
+  <link
+    name="front_right_steering_link">
+    <inertial>
+      <origin
+        xyz="-4.154E-09 -0.02223 -0.096517"
+        rpy="0 0 0" />
+      <mass
+        value="0.059377" />
+      <inertia
+        ixx="6.0413E-05"
+        ixy="2.9097E-21"
+        ixz="-2.703E-21"
+        iyy="5.6721E-05"
+        iyz="-1.1933E-20"
+        izz="2.1418E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/front_right_steering_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/front_right_steering_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  
+  <joint
+    name="front_right_steering_joint"
+    type="revolute">
+    <origin
+      xyz="0.1745 -0.26918 -0.3674"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="front_right_steering_link" />
+    <!-- <axis
+      xyz="0 0 -1" /> -->
+      <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-0.784"
+      upper="0.784"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+
+
+	<transmission name="front_right_steering_trans">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="front_right_steering_joint">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="front_right_servo_motor">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+
+
+  <!-- BACK-LEFT-STEERING-LINK -->
+  <link
+    name="back_left_steering_link">
+    <inertial>
+      <origin
+        xyz="-1.683E-08 0.018717 -0.061551"
+        rpy="0 0 0" />
+      <mass
+        value="0.095385" />
+      <inertia
+        ixx="6.9531E-05"
+        ixy="-2.5406E-11"
+        ixz="8.0633E-12"
+        iyy="6.5032E-05"
+        iyz="3.0924E-06"
+        izz="3.7514E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/back_left_steering_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/back_left_steering_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  
+  <joint
+    name="back_left_steering_joint"
+    type="revolute">
+    <origin
+      xyz="-0.1745 0.26918 -0.3674"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="back_left_steering_link" />
+    <!-- <axis
+      xyz="0 0 -1" /> -->
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-0.784"
+      upper="0.784"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+
+
+	<transmission name="back_left_steering_trans">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="back_left_steering_joint">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="back_left_servo_motor">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+
+  <!-- BACK-RIGHT-STEERING-LINK -->
+  <link
+    name="back_right_steering_link">
+    <inertial>
+      <origin
+        xyz="0.016784 -0.016917 -0.064914"
+        rpy="0 0 0" />
+      <mass
+        value="0.10554" />
+      <inertia
+        ixx="7.8238E-05"
+        ixy="-2.5406E-11"
+        ixz="-8.0633E-12"
+        iyy="7.3739E-05"
+        iyz="-3.0924E-06"
+        izz="3.7594E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/back_right_steering_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/back_right_steering_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="back_right_steering_joint"
+    type="revolute">
+    <origin
+      xyz="-0.1745 -0.26918 -0.3674"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="back_right_steering_link" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-0.784"
+      upper="0.784"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+
+
+  <transmission name="back_right_steering_trans">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="back_right_steering_joint">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="back_right_servo_motor">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  <!-- Updated Gazebo properties for mid links -->
+  <gazebo reference="front_left_steering_link">
+    <material>Gazebo/White</material>
+    <mu1>0.5</mu1>
+    <mu2>0.5</mu2>
+    <kp>10000000.0</kp>
+    <kd>1.0</kd>
+    <selfCollide>false</selfCollide>
+    <gravity>true</gravity>
+  </gazebo>
+
+  <gazebo reference="front_right_steering_link">
+    <material>Gazebo/White</material>
+    <mu1>0.5</mu1>
+    <mu2>0.5</mu2>
+    <kp>10000000.0</kp>
+    <kd>1.0</kd>
+    <selfCollide>false</selfCollide>
+    <gravity>true</gravity>
+  </gazebo>
+
+  <gazebo reference="back_left_steering_link">
+    <material>Gazebo/White</material>
+    <mu1>0.5</mu1>
+    <mu2>0.5</mu2>
+    <kp>10000000.0</kp>
+    <kd>1.0</kd>
+    <selfCollide>false</selfCollide>
+    <gravity>true</gravity>
+  </gazebo>
+
+  <gazebo reference="back_right_steering_link">
+    <material>Gazebo/White</material>
+    <mu1>0.5</mu1>
+    <mu2>0.5</mu2>
+    <kp>10000000.0</kp>
+    <kd>1.0</kd>
+    <selfCollide>false</selfCollide>
+    <gravity>true</gravity>
+  </gazebo>
+
+<!-- ===========================================WHEEL-LINKS================================================================ -->
+<!-- FFL-WHEEL-LINK -->
+  <link
+    name="ffl_wheel_link">
+    <inertial>
+      <origin
+        xyz="1.1283E-07 -0.031402 -7.6502E-09"
+        rpy="0 0 0" />
+      <mass
+        value="1.6937" />
+      <inertia
+        ixx="0.004084"
+        ixy="1.863E-09"
+        ixz="1.0596E-09"
+        iyy="0.007781"
+        iyz="-5.3178E-13"
+        izz="0.0040841" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/ffl_wheel_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/ffl_wheel_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint
+    name="ffl_wheel_joint"
+    type="continuous">
+    <origin
+      xyz="0 0.1102 -0.096517"
+      rpy="0 0 0" />
+    <parent
+      link="front_left_steering_link" />
+    <child
+      link="ffl_wheel_link" />
+    <!-- <axis
+      xyz="0 -1 0" /> -->
+      <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-3.14"
+      upper="3.14"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+  
+  <transmission name="ffl_wheel_trans">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="ffl_wheel_joint">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="ffl_wheel_motor">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+<!-- FFR-WHEEL-LINK -->
+  <link
+    name="ffr_wheel_link">
+    <inertial>
+      <origin
+        xyz="-1.1283E-07 0.031402 -7.6524E-09"
+        rpy="0 0 0" />
+      <mass
+        value="1.6937" />
+      <inertia
+        ixx="0.004084"
+        ixy="1.863E-09"
+        ixz="-1.0596E-09"
+        iyy="0.007781"
+        iyz="5.1703E-13"
+        izz="0.0040841" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/ffr_wheel_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/ffr_wheel_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint
+    name="ffr_wheel_joint"
+    type="continuous">
+    <origin
+      xyz="0 -0.1102 -0.096517"
+      rpy="0 0 0" />
+    <parent
+      link="front_right_steering_link" />
+    <child
+      link="ffr_wheel_link" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-3.14"
+      upper="3.14"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+
+  <transmission name="ffr_wheel_trans">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="ffr_wheel_joint">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="ffr_wheel_motor">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+
+  <!-- RFL-WHEEL-LINK -->
+  <link
+    name="rfl_wheel_link">
+    <inertial>
+      <origin
+        xyz="1.1283E-07 -0.031402 -7.6499E-09"
+        rpy="0 0 0" />
+      <mass
+        value="1.6937" />
+      <inertia
+        ixx="0.004084"
+        ixy="1.863E-09"
+        ixz="1.0596E-09"
+        iyy="0.007781"
+        iyz="-5.3032E-13"
+        izz="0.0040841" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/rfl_wheel_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/rfl_wheel_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint
+    name="rfl_wheel_joint"
+    type="continuous">
+    <origin
+      xyz="0 0.1102 -0.096517"
+      rpy="0 0 0" />
+    <parent
+      link="back_left_steering_link" />
+    <child
+      link="rfl_wheel_link" />
+    <!-- <axis
+      xyz="0 -1 0" /> -->
+      <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-3.14"
+      upper="3.14"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+
+  <transmission name="rfl_wheel_trans">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="rfl_wheel_joint">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="rfl_wheel_motor">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+
+  <!-- RFR-WHEEL-LINK -->
+  <link
+    name="rfr_wheel_link">
+    <inertial>
+      <origin
+        xyz="-1.1282E-07 0.031402 -7.6516E-09"
+        rpy="0 0 0" />
+      <mass
+        value="1.6937" />
+      <inertia
+        ixx="0.004084"
+        ixy="1.863E-09"
+        ixz="-1.0596E-09"
+        iyy="0.007781"
+        iyz="5.1892E-13"
+        izz="0.0040841" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/rfr_wheel_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh  filename="package://inventa_description/meshes/HypeR_V8.0/rfr_wheel_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint
+    name="rfr_wheel_joint"
+    type="continuous">
+    <origin
+      xyz="0 -0.1102 -0.096517"
+      rpy="0 0 0" />
+    <parent
+      link="back_right_steering_link" />
+    <child
+      link="rfr_wheel_link" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-3.14"
+      upper="3.14"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+
+  <transmission name="rfr_wheel_trans">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="rfr_wheel_joint">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="rfr_wheel_motor">
+      <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  <!-- Updated Gazebo properties for wheel links -->
+  <gazebo reference="rfl_wheel_link">
+    <material>Gazebo/DarkGrey</material>
+    <!-- <mu1>1.5</mu1>
+    <mu2>1.5</mu2>
+    <kp>10000000.0</kp>
+    <kd>1.0</kd>
+    <fdir1>1 0 0</fdir1>
+    <maxVel>100.0</maxVel>
+    <minDepth>0.001</minDepth> -->
+    <selfCollide>false</selfCollide>
+    <gravity>true</gravity>
+  </gazebo>
+
+
+  <gazebo reference="rfr_wheel_link">
+    <material>Gazebo/DarkGrey</material>
+    <!-- <mu1>1.5</mu1>
+    <mu2>1.5</mu2>
+    <kp>10000000.0</kp>
+    <kd>1.0</kd>
+    <fdir1>1 0 0</fdir1>
+    <maxVel>100.0</maxVel>
+    <minDepth>0.001</minDepth> -->
+    <selfCollide>false</selfCollide>
+    <gravity>true</gravity>
+  </gazebo>
+
+  <gazebo reference="ffl_wheel_link">
+    <material>Gazebo/DarkGrey</material>
+    <!-- <mu1>1.5</mu1>
+    <mu2>1.5</mu2>
+    <kp>10000000.0</kp>
+    <kd>1.0</kd>
+    <fdir1>1 0 0</fdir1>
+    <maxVel>100.0</maxVel>
+    <minDepth>0.001</minDepth> -->
+    <selfCollide>false</selfCollide>
+    <gravity>true</gravity>
+  </gazebo>
+
+  <gazebo reference="ffr_wheel_link">
+    <material>Gazebo/DarkGrey</material>
+    <!-- <mu1>1.5</mu1>
+    <mu2>1.5</mu2>
+    <kp>10000000.0</kp>
+    <kd>1.0</kd>
+    <fdir1>1 0 0</fdir1>
+    <maxVel>100.0</maxVel>
+    <minDepth>0.001</minDepth> -->
+    <selfCollide>false</selfCollide>
+    <gravity>true</gravity>
+  </gazebo>
+
+
+<!-- ============================================================================================================== -->
+  <!-- realsense_camera -->
+  <xacro:include filename="$(find inventa_description)/urdf/accessories/realsense_d455/_d455.urdf.xacro"/>
+  <xacro:sensor_d455 parent="base_link">
+    <origin
+      xyz="0.2005 0 0.72354"
+      rpy="0 0 0" />
+  </xacro:sensor_d455>    
+<!-- ============================================================================================================== -->
+<!-- rplidar -->
+  <xacro:include filename="$(find inventa_description)/urdf/accessories/lidar/rplidar.urdf.xacro"/>
+
+  <xacro:rplidar parent="base_link">
+    <origin
+      xyz="0.332 0 -0.27344"
+      rpy="0 0 0" />
+  </xacro:rplidar>     
+<!-- ============================================================================================================== -->
+<!-- Unitree4D -->
+  <xacro:include filename="$(find inventa_description)/urdf/accessories/lidar/unitree4D.urdf.xacro"/> 
+
+  <xacro:Unitree-L1 name="Unitree4D" parent="base_link" topic="/unitree_lidar_l1/points" hz="11" lasers="90" samples="360" collision_range="0.05" min_range="0.5" max_range="20.0" noise="0.02" min_angle="0" max_angle="1.57" gpu="false">
+    <origin
+      xyz="-0.177 0 0.70445"
+      rpy="0 0 0" />
+  </xacro:Unitree-L1>
+<!-- ============================================================================================================== -->
+<!-- IMU -->
+  <xacro:include filename="$(find inventa_description)/urdf/includes/parts/sensors/imu/bno055.urdf.xacro" />
+    <!-- Xacro arguments for imu -->
+    <xacro:arg name="imu_enable" default="true" />
+    <xacro:if value="$(arg imu_enable)" >
+      <xacro:sensor_imu name="imu" topic_ns="imu" parent="base_link" >
+        <origin xyz="-0.1 0 0.5" rpy="0 0 0" />
+      </xacro:sensor_imu>
+  </xacro:if>
+<!-- ============================================================================================================== -->
+<!-- GPS -->
+  <xacro:include filename="$(find inventa_description)/urdf/includes/parts/sensors/gps/mtk3339.urdf.xacro" />  
+  <!-- Xacro arguments for gps -->
+  <xacro:arg name="gps_enable" default="true" />
+  <xacro:if value="$(arg gps_enable)" >
+    <xacro:sensor_gps name="mtk3339" topic_ns="mtk_gps" parent="imu_link" >
+      <origin xyz="-0.044 0 0.0" rpy="0 0 0" />
+    </xacro:sensor_gps>
+  </xacro:if>
+<!-- ============================================================================================================== -->
+<!-- Sonar -->
+  <xacro:include filename="$(find inventa_description)/urdf/includes/parts/sensors/sonar/hcsr04.urdf.xacro" /> 
+  <!-- Xacro arguments for ultrasonic -->
+  <xacro:arg name="ultrasonic_enable" default="true" /> 
+  <xacro:property name="base_len" value="0.6"/>
+  <xacro:property name="base_width" value="0.6"/>
+  <xacro:property name="base_height" value="0.1"/>
+  <xacro:property name="base_z_offset" value="0.013"/>
+  <!-- Ultrasonic Sensors -->
+  <xacro:if value="$(arg ultrasonic_enable)" >
+    <xacro:sensor_sonar name="sonar_1" topic_ns="sonar_back_rt" prefix="back_rt" parent="base_link" >
+      <origin xyz="0 -${base_width/2} ${base_height/2}" rpy="0 0 -${pi/2}" />
+    </xacro:sensor_sonar>
+
+    <xacro:sensor_sonar name="sonar_2" topic_ns="sonar_front_rt45" prefix="front_rt45" parent="base_link" >
+      <origin xyz="${base_len/2} -${base_width/2} ${base_height+(base_z_offset)/2}" rpy="0 0 -${pi/4}" />
+    </xacro:sensor_sonar>
+
+    <xacro:sensor_sonar name="sonar_3" topic_ns="sonar_front" prefix="front" parent="base_link" >
+      <origin xyz="${base_len/2} 0 ${base_height+(base_z_offset)/2}" rpy="0 0 0" />
+    </xacro:sensor_sonar>
+
+    <xacro:sensor_sonar name="sonar_4" topic_ns="sonar_front_lt45" prefix="front_lt45" parent="base_link" >
+      <origin xyz="${base_len/2} ${base_width/2} ${base_height+(base_z_offset)/2}" rpy="0 0 ${pi/4}" />
+    </xacro:sensor_sonar>
+
+    <xacro:sensor_sonar name="sonar_5" topic_ns="sonar_back_lt" prefix="back_lt" parent="base_link" >
+      <origin xyz="0 ${base_width/2} ${base_height/2}" rpy="0 0 ${pi/2}" />
+    </xacro:sensor_sonar>
+
+    <xacro:sensor_sonar name="sonar_6" topic_ns="sonar_back_lt45" prefix="back_lt45" parent="base_link" >
+      <origin xyz="-${base_len/2} 0 ${base_height+(base_z_offset)/2}" rpy="0 0 ${pi/2 + pi/2}" />
+    </xacro:sensor_sonar>
+    
+  </xacro:if>
+<!-- ============================================================================================================== -->
+  <!-- =============== Gazebo =============== -->
+  <!-- <xacro:include filename="$(find inventa_description)/urdf/inventa.gazebo" /> -->
+  <xacro:include filename="$(find inventa_description)/urdf/robot.gazebo" />  
+
+</robot>

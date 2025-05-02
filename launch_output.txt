@@ -1,0 +1,244 @@
+xacro: in-order processing became default in ROS Melodic. You can drop the option.
+... logging to /home/nsf24/.ros/log/93d1d848-8f6c-11ef-9dff-cfb6ff2bb239/roslaunch-nsf24-ROG-Strix-G614JV-G614JV-56202.log
+Checking log directory for disk usage. This may take a while.
+Press Ctrl-C to interrupt
+Done checking log file disk usage. Usage is <1GB.
+]2;/home/nsf24/inventa_ws/src/inventa_project/launch/inventa_world.launch
+[1mstarted roslaunch server http://nsf24-ROG-Strix-G614JV-G614JV:45761/[0m
+
+SUMMARY
+========
+
+PARAMETERS
+ * /bluetooth_teleop/joy_node/autorepeat_rate: 20
+ * /bluetooth_teleop/joy_node/deadzone: 0.1
+ * /bluetooth_teleop/joy_node/dev: /dev/input/js0
+ * /bluetooth_teleop/teleop_twist_joy/axis_angular: 3
+ * /bluetooth_teleop/teleop_twist_joy/axis_linear: 1
+ * /bluetooth_teleop/teleop_twist_joy/enable_button: 4
+ * /bluetooth_teleop/teleop_twist_joy/enable_turbo_button: 5
+ * /bluetooth_teleop/teleop_twist_joy/scale_angular: 1.4
+ * /bluetooth_teleop/teleop_twist_joy/scale_linear: 0.4
+ * /bluetooth_teleop/teleop_twist_joy/scale_linear_turbo: 2.0
+ * /depthimage_to_laserscan/output_frame_id: camera_depth_frame
+ * /depthimage_to_laserscan/range_max: 10.0
+ * /depthimage_to_laserscan/range_min: 0.45
+ * /depthimage_to_laserscan/scan_height: 1
+ * /ekf_localization/base_link_frame: base_footprint
+ * /ekf_localization/frequency: 50
+ * /ekf_localization/imu0: imu/data
+ * /ekf_localization/imu0_config: [False, False, Fa...
+ * /ekf_localization/imu0_differential: False
+ * /ekf_localization/odom0: /four_wheel_steer...
+ * /ekf_localization/odom0_config: [False, False, Fa...
+ * /ekf_localization/odom0_differential: False
+ * /ekf_localization/odom_frame: odom
+ * /ekf_localization/predict_to_current_time: True
+ * /ekf_localization/world_frame: odom
+ * /four_wheel_steering_controller/angular/z/has_acceleration_limits: True
+ * /four_wheel_steering_controller/angular/z/has_velocity_limits: True
+ * /four_wheel_steering_controller/angular/z/max_acceleration: 0.5
+ * /four_wheel_steering_controller/angular/z/max_velocity: 3.14
+ * /four_wheel_steering_controller/angular/z/min_acceleration: -0.5
+ * /four_wheel_steering_controller/angular/z/min_velocity: -3.14
+ * /four_wheel_steering_controller/base_frame_id: base_footprint
+ * /four_wheel_steering_controller/cmd_vel_timeout: 0.25
+ * /four_wheel_steering_controller/enable_odom_tf: False
+ * /four_wheel_steering_controller/front_steering: ['front_left_stee...
+ * /four_wheel_steering_controller/front_wheel: ['ffl_wheel_joint...
+ * /four_wheel_steering_controller/k_l: 0.1
+ * /four_wheel_steering_controller/k_r: 0.1
+ * /four_wheel_steering_controller/linear/x/has_acceleration_limits: True
+ * /four_wheel_steering_controller/linear/x/has_velocity_limits: True
+ * /four_wheel_steering_controller/linear/x/max_acceleration: 0.5
+ * /four_wheel_steering_controller/linear/x/max_velocity: 1.667
+ * /four_wheel_steering_controller/linear/x/min_acceleration: -0.5
+ * /four_wheel_steering_controller/linear/x/min_velocity: -1.667
+ * /four_wheel_steering_controller/pose_covariance_diagonal: [0.001, 0.001, 10...
+ * /four_wheel_steering_controller/publish_cmd: True
+ * /four_wheel_steering_controller/publish_rate: 50
+ * /four_wheel_steering_controller/rear_steering: ['rear_left_steer...
+ * /four_wheel_steering_controller/rear_wheel: ['rfl_wheel_joint...
+ * /four_wheel_steering_controller/twist_covariance_diagonal: [0.001, 0.001, 10...
+ * /four_wheel_steering_controller/type: four_wheel_steeri...
+ * /four_wheel_steering_controller/wheel_radius: 0.101
+ * /four_wheel_steering_controller/wheel_radius_multiplier: 1.0
+ * /four_wheel_steering_controller/wheel_separation: 0.291
+ * /four_wheel_steering_controller/wheel_separation_multiplier: 1.0
+ * /four_wheel_steering_controller/wheel_steering_y_offset: 0.03
+ * /gazebo/enable_ros_network: True
+ * /gazebo_ros_control/pid_gains/ffl_wheel_joint/d: 0.0
+ * /gazebo_ros_control/pid_gains/ffl_wheel_joint/i: 1
+ * /gazebo_ros_control/pid_gains/ffl_wheel_joint/p: 10.0
+ * /gazebo_ros_control/pid_gains/ffr_wheel_joint/d: 0.0
+ * /gazebo_ros_control/pid_gains/ffr_wheel_joint/i: 1
+ * /gazebo_ros_control/pid_gains/ffr_wheel_joint/p: 10.0
+ * /gazebo_ros_control/pid_gains/front_left_steering_joint/d: 0.01
+ * /gazebo_ros_control/pid_gains/front_left_steering_joint/i: 1
+ * /gazebo_ros_control/pid_gains/front_left_steering_joint/p: 50
+ * /gazebo_ros_control/pid_gains/front_right_steering_joint/d: 0.01
+ * /gazebo_ros_control/pid_gains/front_right_steering_joint/i: 1
+ * /gazebo_ros_control/pid_gains/front_right_steering_joint/p: 50
+ * /gazebo_ros_control/pid_gains/rear_left_steering_joint/d: 0.01
+ * /gazebo_ros_control/pid_gains/rear_left_steering_joint/i: 1
+ * /gazebo_ros_control/pid_gains/rear_left_steering_joint/p: 50
+ * /gazebo_ros_control/pid_gains/rear_right_steering_joint/d: 0.01
+ * /gazebo_ros_control/pid_gains/rear_right_steering_joint/i: 1
+ * /gazebo_ros_control/pid_gains/rear_right_steering_joint/p: 50
+ * /gazebo_ros_control/pid_gains/rfl_wheel_joint/d: 0.0
+ * /gazebo_ros_control/pid_gains/rfl_wheel_joint/i: 1
+ * /gazebo_ros_control/pid_gains/rfl_wheel_joint/p: 10.0
+ * /gazebo_ros_control/pid_gains/rfr_wheel_joint/d: 0.0
+ * /gazebo_ros_control/pid_gains/rfr_wheel_joint/i: 1
+ * /gazebo_ros_control/pid_gains/rfr_wheel_joint/p: 10.0
+ * /gimbal_arm_controller/action_monitor_rate: 10
+ * /gimbal_arm_controller/joints: ['joint5', 'joint...
+ * /gimbal_arm_controller/state_publish_rate: 50
+ * /gimbal_arm_controller/stop_trajectory_duration: 0.5
+ * /gimbal_arm_controller/type: position_controll...
+ * /joint_state_controller/publish_rate: 50
+ * /joint_state_controller/type: joint_state_contr...
+ * /laserscan_multi_merger/cloud_destination_topic: /merged_cloud
+ * /laserscan_multi_merger/destination_frame: base_footprint
+ * /laserscan_multi_merger/laserscan_topics: /front/scan /unit...
+ * /laserscan_multi_merger/scan_destination_topic: /scan_multi
+ * /lidar_head_controller/joint: lidar_head_joint
+ * /lidar_head_controller/pid/d: 0.0
+ * /lidar_head_controller/pid/i: 1.0
+ * /lidar_head_controller/pid/p: 10.0
+ * /lidar_head_controller/publish_rate: 50
+ * /lidar_head_controller/type: velocity_controll...
+ * /pointcloud_to_laserscan/max_height: 1.0
+ * /pointcloud_to_laserscan/min_height: 0.05
+ * /pointcloud_to_laserscan/target_frame: base_footprint
+ * /robot_description: <?xml version="1....
+ * /rosdistro: noetic
+ * /rosversion: 1.17.0
+ * /sonar_to_laserscan/field_of_view: 0.5
+ * /sonar_to_laserscan/max_range: 20.0
+ * /sonar_to_laserscan/min_range: 0.05
+ * /sonar_to_laserscan/output_frame_id: base_link
+ * /sonar_to_laserscan/output_topic: /sonar_scan
+ * /sonar_to_laserscan/rate: 10.0
+ * /sonar_to_laserscan/sonar_topics: ['/sonar_1', '/so...
+ * /twist_marker_server/link_name: base_footprint
+ * /twist_mux/locks: [{'name': 'e_stop...
+ * /twist_mux/topics: [{'name': 'joy', ...
+ * /use_sim_time: True
+
+NODES
+  /
+    controller_spawner (controller_manager/spawner)
+    depthimage_to_laserscan (depthimage_to_laserscan/depthimage_to_laserscan)
+    ekf_localization (robot_localization/ekf_localization_node)
+    gazebo (gazebo_ros/gzserver)
+    gazebo_gui (gazebo_ros/gzclient)
+    laserscan_multi_merger (ira_laser_tools/laserscan_multi_merger)
+    pointcloud_to_laserscan (pointcloud_to_laserscan/pointcloud_to_laserscan_node)
+    robot_state_publisher (robot_state_publisher/robot_state_publisher)
+    sonar_to_laserscan (sonar_to_laserscan/sonar_to_laserscan_node)
+    twist_marker_server (interactive_marker_twist_server/marker_server)
+    twist_mux (twist_mux/twist_mux)
+    urdf_spawner (gazebo_ros/spawn_model)
+  /bluetooth_teleop/
+    joy_node (joy/joy_node)
+    teleop_twist_joy (teleop_twist_joy/teleop_node)
+
+auto-starting new master
+[1mprocess[master]: started with pid [56275][0m
+[1mROS_MASTER_URI=http://localhost:11311[0m
+]2;/home/nsf24/inventa_ws/src/inventa_project/launch/inventa_world.launch http://localhost:11311
+[1msetting /run_id to 93d1d848-8f6c-11ef-9dff-cfb6ff2bb239[0m
+[1mprocess[rosout-1]: started with pid [56316][0m
+started core service [/rosout]
+[1mprocess[gazebo-2]: started with pid [56323][0m
+[1mprocess[gazebo_gui-3]: started with pid [56326][0m
+[1mprocess[robot_state_publisher-4]: started with pid [56332][0m
+[1mprocess[depthimage_to_laserscan-5]: started with pid [56334][0m
+[33m[ WARN] [1729488197.729641238]: link 'back_rt_sonar_1_link' material 'purple' undefined.[0m
+[33m[ WARN] [1729488197.734220744]: link 'back_rt_sonar_1_link' material 'purple' undefined.[0m
+[33m[ WARN] [1729488197.734286216]: link 'front_rt45_sonar_2_link' material 'purple' undefined.[0m
+[33m[ WARN] [1729488197.734299897]: link 'front_rt45_sonar_2_link' material 'purple' undefined.[0m
+[33m[ WARN] [1729488197.734351091]: link 'front_sonar_3_link' material 'purple' undefined.[0m
+[33m[ WARN] [1729488197.734363788]: link 'front_sonar_3_link' material 'purple' undefined.[0m
+[33m[ WARN] [1729488197.734396931]: link 'front_lt45_sonar_4_link' material 'purple' undefined.[0m
+[33m[ WARN] [1729488197.734412437]: link 'front_lt45_sonar_4_link' material 'purple' undefined.[0m
+[33m[ WARN] [1729488197.734444615]: link 'back_lt_sonar_5_link' material 'purple' undefined.[0m
+[33m[ WARN] [1729488197.734456557]: link 'back_lt_sonar_5_link' material 'purple' undefined.[0m
+[33m[ WARN] [1729488197.734497148]: link 'back_lt45_sonar_6_link' material 'purple' undefined.[0m
+[33m[ WARN] [1729488197.734510053]: link 'back_lt45_sonar_6_link' material 'purple' undefined.[0m
+[31m[ERROR] [1729488197.816161072]: Couldn't open joystick /dev/input/js0. Will retry every second.[0m
+[0m[ INFO] [1729488198.072679932]: Finished loading Gazebo ROS API Plugin.[0m
+[0m[ INFO] [1729488198.073082139]: waitForService: Service [/gazebo/set_physics_properties] has not been advertised, waiting...[0m
+[0m[ INFO] [1729488199.218480401]: waitForService: Service [/gazebo/set_physics_properties] is now available.[0m
+[0m[ INFO] [1729488199.254144247, 1517.360000000]: Physics dynamic reconfigure ready.[0m
+[0m[ INFO] [1729488203.357106311, 1517.472000000]: Velodyne laser plugin missing <organize_cloud>, defaults to false[0m
+[0m[ INFO] [1729488203.357128081, 1517.472000000]: Velodyne laser plugin missing <min_intensity>, defaults to no clipping[0m
+[0m[ INFO] [1729488203.358069936, 1517.472000000]: Velodyne laser plugin ready, 90 lasers[0m
+[0m[ INFO] [1729488203.577128111, 1517.472000000]: Laser Plugin: Using the 'robotNamespace' param: '/'[0m
+[0m[ INFO] [1729488203.577148709, 1517.472000000]: Starting GazeboRosLaser Plugin (ns = /)[0m
+[0m[ INFO] [1729488203.577818387, 1517.472000000]: GPU Laser Plugin (ns = /) <tf_prefix_>, set to ""[0m
+[0m[ INFO] [1729488203.577996140, 1517.472000000]: LoadThread function completed[0m
+[0m[ INFO] [1729488203.624754805, 1517.472000000]: Realsense Gazebo ROS plugin loading.[0m
+
+RealSensePlugin: The realsense_camera plugin is attach to model inventa
+[31m[ERROR] [1729488203.794434035, 1517.472000000]: No p gain specified for pid.  Namespace: /gazebo_ros_control/pid_gains/joint5[0m
+[31m[ERROR] [1729488203.794956142, 1517.472000000]: No p gain specified for pid.  Namespace: /gazebo_ros_control/pid_gains/joint6[0m
+[31m[ERROR] [1729488203.795350537, 1517.472000000]: No p gain specified for pid.  Namespace: /gazebo_ros_control/pid_gains/joint7[0m
+[31m[ERROR] [1729488203.795867332, 1517.472000000]: No p gain specified for pid.  Namespace: /gazebo_ros_control/pid_gains/joint8[0m
+[33m[ WARN] [1729488203.799462627, 1517.473000000]: Failed to meet update rate! Took 1517.4729999999999563[0m
+[33m[ WARN] [1729488203.800292198, 1517.474000000]: Failed to meet update rate! Took 1517.4539999999999509[0m
+terminate called after throwing an instance of 'std::runtime_error'
+  what():  unsupported colour encoding: 8UC1
+Aborted (core dumped)
+[0m[ INFO] [1729488197.760022242]: Waiting for topics ...[0m
+[0m[ INFO] [1729488198.771171940]: Waiting for topics ...[0m
+[0m[ INFO] [1729488199.771724052]: Waiting for topics ...[0m
+[0m[ INFO] [1729488200.772394183]: Waiting for topics ...[0m
+[0m[ INFO] [1729488201.772998295]: Waiting for topics ...[0m
+[0m[ INFO] [1729488202.773690247]: Waiting for topics ...[0m
+[0m[ INFO] [1729488203.774427512]: Waiting for topics ...[0m
+[0m[ INFO] [1729488204.775694576, 1518.441000000]: Subscribing to topics	3[0m
+/front/scan /realsense_scan /unitree_scan [WARN] [1729488365.027562, 1525.854000]: Controller Spawner error while taking down controllers: unable to connect to service: [Errno 111] Connection refused
+[INFO] [1729488198.022060, 0.000000]: Controller Spawner: Waiting for service controller_manager/load_controller
+[INFO] [1729488204.038420, 1517.711000]: Controller Spawner: Waiting for service controller_manager/switch_controller
+[INFO] [1729488204.040190, 1517.713000]: Controller Spawner: Waiting for service controller_manager/unload_controller
+[INFO] [1729488204.041482, 1517.714000]: Loading controller: joint_state_controller
+[INFO] [1729488204.047697, 1517.721000]: Loading controller: four_wheel_steering_controller
+[INFO] [1729488204.067696, 1517.741000]: Loading controller: gimbal_arm_controller
+[INFO] [1729488204.085701, 1517.759000]: Controller Spawner: Loaded controllers: joint_state_controller, four_wheel_steering_controller, gimbal_arm_controller
+[INFO] [1729488204.088786, 1517.762000]: Started controllers: joint_state_controller, four_wheel_steering_controller, gimbal_arm_controller
+[INFO] [1729488365.023789, 1525.854000]: Shutting down spawner. Stopping and unloading controllers...
+[INFO] [1729488365.025145, 1525.854000]: Stopping all controllers...
+[31m[gazebo-2] process has died [pid 56323, exit code 134, cmd /opt/ros/noetic/lib/gazebo_ros/gzserver -e ode /home/nsf24/inventa_ws/src/inventa_project/worlds/inventa_race.world __name:=gazebo __log:=/home/nsf24/.ros/log/93d1d848-8f6c-11ef-9dff-cfb6ff2bb239/gazebo-2.log].
+log file: /home/nsf24/.ros/log/93d1d848-8f6c-11ef-9dff-cfb6ff2bb239/gazebo-2*.log[0m
+[31m[gazebo_gui-3] escalating to SIGTERM[0m
+[1mprocess[pointcloud_to_laserscan-6]: started with pid [56335][0m
+[1mprocess[sonar_to_laserscan-7]: started with pid [56336][0m
+[1mprocess[laserscan_multi_merger-8]: started with pid [56337][0m
+[1mprocess[controller_spawner-9]: started with pid [56338][0m
+[1mprocess[ekf_localization-10]: started with pid [56343][0m
+[1mprocess[twist_mux-11]: started with pid [56356][0m
+[1mprocess[bluetooth_teleop/joy_node-12]: started with pid [56361][0m
+[1mprocess[bluetooth_teleop/teleop_twist_joy-13]: started with pid [56364][0m
+[1mprocess[twist_marker_server-14]: started with pid [56371][0m
+[1mprocess[urdf_spawner-15]: started with pid [56373][0m
+[1m[urdf_spawner-15] process has finished cleanly
+log file: /home/nsf24/.ros/log/93d1d848-8f6c-11ef-9dff-cfb6ff2bb239/urdf_spawner-15*.log[0m
+[twist_marker_server-14] killing on exit
+[bluetooth_teleop/teleop_twist_joy-13] killing on exit
+[bluetooth_teleop/joy_node-12] killing on exit
+[twist_mux-11] killing on exit
+[ekf_localization-10] killing on exit
+[controller_spawner-9] killing on exit
+[laserscan_multi_merger-8] killing on exit
+[depthimage_to_laserscan-5] killing on exit
+[sonar_to_laserscan-7] killing on exit
+[pointcloud_to_laserscan-6] killing on exit
+[robot_state_publisher-4] killing on exit
+[gazebo_gui-3] killing on exit
+[rosout-1] killing on exit
+[master] killing on exit
+shutting down processing monitor...
+... shutting down processing monitor complete
+[1mdone[0m

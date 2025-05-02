@@ -1,0 +1,2 @@
+set(pedsim_srvs_MESSAGE_FILES "")
+set(pedsim_srvs_SERVICE_FILES "/home/nsf24/inventa_sim/src/pedsim_ros_with_gazebo/pedsim_srvs/srv/SetAgentState.srv;/home/nsf24/inventa_sim/src/pedsim_ros_with_gazebo/pedsim_srvs/srv/GetAgentState.srv;/home/nsf24/inventa_sim/src/pedsim_ros_with_gazebo/pedsim_srvs/srv/SetAllAgentsState.srv;/home/nsf24/inventa_sim/src/pedsim_ros_with_gazebo/pedsim_srvs/srv/GetAllAgentsState.srv")

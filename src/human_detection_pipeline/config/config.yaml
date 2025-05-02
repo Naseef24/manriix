@@ -1,0 +1,42 @@
+# Camera Params -> RealSense D455
+camera:
+  fx: 390.6934814453125
+  fy: 390.6934814453125
+  cx: 317.48748779296875
+  cy: 235.6475830078125
+  width: 640
+  height: 480
+
+# Model Configs
+model:
+  name: "yolo11n.pt" # face->yolov8n_100e.pt | full-> yolo11n.pt
+  confidence_threshold: 0.4
+  device: "cuda:0"
+  model_dir: "/home/nsf24/inventa_ws/src/human_detection_pipeline/models"
+  batch_size: 1
+
+# tracker:
+#   confidence_threshold: 0.2
+
+# Depth Processing
+depth:
+  min_depth: 0.3       # in m
+  max_depth: 6.0      
+  
+# Visualization
+visualization:
+  show_display: true
+  text_color: [0, 255, 0]
+  bbox_color: [0, 255, 0]
+
+#Tracking
+tracker:
+  track_thresh: 0.25
+  track_buffer: 30
+  match_thresh: 0.8
+  min_box_area: 100
+  frame_rate: 30
+  max_history: 30
+  max_movement_multiplier: 3.0
+  min_detection_confidence: 0.3
+

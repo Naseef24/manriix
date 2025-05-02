@@ -1,0 +1,8 @@
+prefix=/home/nsf24/inventa_sim/devel
+
+Name: pedsim_sensors
+Description: Description of pedsim_sensors
+Version: 0.1.0
+Cflags: -I/home/nsf24/inventa_sim/src/pedsim_ros_with_gazebo/pedsim_sensors/include
+Libs: -L${prefix}/lib 
+Requires: geometry_msgs nav_msgs pedsim_msgs roscpp rospy sensor_msgs tf pedsim_utils

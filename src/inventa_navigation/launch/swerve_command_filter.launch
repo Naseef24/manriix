@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Load the command filter node -->
+  <node pkg="swerve_command_filter" type="swerve_command_filter.py" name="swerve_command_filter" output="screen">
+    <!-- Parameters -->
+    <param name="max_steering_angle" value="0.95"/>  <!-- Just under the 1.0 limit in controller config -->
+    <param name="preferred_angle_threshold" value="0.6"/>
+    <param name="direction_bias" value="0.7"/>
+    <param name="track" value="0.75"/>
+    <param name="wheel_base" value="0.365"/>
+    <param name="smoothing_factor" value="0.3"/>
+    
+    <!-- Velocity limits - should match controller config -->
+    <param name="max_x_vel" value="1.667"/>
+    <param name="max_y_vel" value="1.0"/>
+    <param name="max_angular_vel" value="1.0"/>
+    
+    <!-- Acceleration limits -->
+    <param name="max_linear_accel" value="1.0"/>
+    <param name="max_angular_accel" value="1.0"/>
+    
+    <!-- Remap topics -->
+    <remap from="cmd_vel_in" to="/move_base/cmd_vel"/>
+    <remap from="cmd_vel_out" to="/swervebot/swerve_controller/cmd_vel"/>
+    <remap from="odom" to="/swervebot/swerve_controller/odom"/>
+  </node>
+  
+  <!-- Load TEB local planner specific parameters -->
+  <!-- <rosparam file="$(find your_package_name)/config/teb_local_planner_params.yaml" command="load" /> -->
+</launch>

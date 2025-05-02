@@ -1,0 +1,38 @@
+base_local_planner: base_local_planner/TrajectoryPlannerROS
+TrajectoryPlannerROS:
+  max_vel_x: 0.5 #0.825
+  min_vel_x: 0.1 #-0.5
+  max_rotational_vel: 0.2
+  min_in_place_vel_theta: 0.314 #0.1  # Reduced from 1.04 to allow slower rotations
+
+  acc_lim_th: 20 #3.0  # Reduced from 4.0 to slow down rotational acceleration
+  acc_lim_x: 10 #2.0
+  acc_lim_y: 0.0
+
+  holonomic_robot: false #true
+
+  meter_scoring: true
+
+  # Added parameters
+  yaw_goal_tolerance: 0.157 #0.25 #0.157 #0.1  # In radians, allows for a small orientation error
+  xy_goal_tolerance: 0.25 #0.05 #0.10   # In meters, allows for a small position error
+  latch_xy_goal_tolerance: false #true  # Stops rotating once within xy tolerance
+
+  pdist_scale: 0.75 #0.8  # Path distance scale
+  gdist_scale: 1 #0.4  # Goal distance scale
+  occdist_scale: 0.1 #0.01  # Uncommented, helps avoid obstacles
+
+  sim_time: 2.0  # Simulation time for trajectory scoring
+  sim_granularity: 0.02 #0.025  # Resolution of simulation
+  angular_sim_granularity: 0.02 #0.025  # Resolution for angular simulation
+
+  stop_time_buffer: 0.5  # Time to account for stopping
+  oscillation_reset_dist: 0.05  # Distance to travel to reset oscillation flags
+
+  # Uncommented and adjusted
+  dwa: true  # Use Dynamic Window Approach
+  vx_samples: 6 #10
+  vtheta_samples: 20  # Added to increase orientation sampling
+
+  # Added to help with final orientation
+  publish_cost_grid_pc: true

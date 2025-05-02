@@ -1,0 +1,8 @@
+prefix=/home/nsf24/inventa_sim/devel
+
+Name: pedsim
+Description: Description of pedsim
+Version: 0.2.0
+Cflags: -I/home/nsf24/inventa_sim/src/pedsim_ros_with_gazebo/3rdparty/libpedsim/include/
+Libs: -L${prefix}/lib -lpedsim
+Requires: roscpp

@@ -1,0 +1,8 @@
+prefix=/home/nsf24/inventa_sim/devel
+
+Name: pedsim_simulator
+Description: Description of pedsim_simulator
+Version: 0.1.1
+Cflags: -I/home/nsf24/inventa_sim/devel/include -I/home/nsf24/inventa_sim/src/pedsim_ros_with_gazebo/pedsim_simulator/include
+Libs: -L${prefix}/lib 
+Requires: roscpp rospy std_msgs pedsim pedsim_msgs pedsim_srvs pedsim_utils std_srvs geometry_msgs nav_msgs tf cmake_modules dynamic_reconfigure

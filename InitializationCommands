@@ -1,0 +1,68 @@
+Start from here>>>>
+
+Map Creation
+================
+1. Terminal<1>
+-gazebo+robot-
+roslaunch inventa_gazebo inventa_world.launch config:=front_laser
+
+2. Terminal<2>
+-gmapping-
+roslaunch inventa_navigation gmapping_demo.launch
+
+3. Terminal<3>
+-rviz-
+roslaunch inventa_viz view_robot.launch config:=gmapping
+
+4. Terminal<4>
+-save map-
+cd /home/nsf24/inventa_sim/src/inventa_navigation/maps
+
+rosrun map_server map_saver -f <map_name>
+Ex: rosrun map_server map_saver -f hospital
+===============================================
+
+-Teleop_keyboard-
+rosrun teleop_twist_keyboard teleop_twist_keyboard.py
+
+-EXTRA-odom navigation
+roslaunch inventa_navigation odom_navigation_demo.launch
+
+
+
+2. Localization
+================
+
+roslaunch inventa_gazebo inventa_world.launch config:=front_laser
+
+roslaunch inventa_navigation amcl_demo.launch
+
+roslaunch inventa_viz view_robot.launch config:=localization
+
+roslaunch inventa_navigation move_base.launch
+
+
+===============================================
+rosrun rqt_tf_tree rqt_tf_tree
+================================================
+INVENTA
+================================================
+rosrun xacro xacro $(rospack find inventa_description)/urdf/inventa_scan.urdf.xacro > /tmp/check_this.urdf
+
+check_urdf /tmp/check_this.urdf
+
+============================================================================
+JACKAL
+============================================================================
+
+rosrun xacro xacro $(rospack find jackal_description)/urdf/jackal.urdf.xacro > /tmp/check_this.urdf
+
+check_urdf /tmp/check_this.urdf
+
+====================================================================
+rosrun joint_state_publisher_gui joint_state_publisher_gui
+
+
+==================================================================================================
+rosrun teleop_twist_keyboard teleop_twist_keyboard.py
+================================================================

@@ -1,0 +1,2 @@
+set(spencer_vision_msgs_MESSAGE_FILES "/home/nsf24/inventa_sim/src/pedsim_ros_with_gazebo/2ndparty/spencer_messages/spencer_vision_msgs/msg/PersonImage.msg;/home/nsf24/inventa_sim/src/pedsim_ros_with_gazebo/2ndparty/spencer_messages/spencer_vision_msgs/msg/PersonImages.msg;/home/nsf24/inventa_sim/src/pedsim_ros_with_gazebo/2ndparty/spencer_messages/spencer_vision_msgs/msg/PersonROI.msg;/home/nsf24/inventa_sim/src/pedsim_ros_with_gazebo/2ndparty/spencer_messages/spencer_vision_msgs/msg/PersonROIs.msg")
+set(spencer_vision_msgs_SERVICE_FILES "")

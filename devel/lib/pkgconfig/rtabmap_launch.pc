@@ -1,0 +1,8 @@
+prefix=/home/nsf24/inventa_sim/devel
+
+Name: rtabmap_launch
+Description: Description of rtabmap_launch
+Version: 0.21.9
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

@@ -1,0 +1,51 @@
+# Camera Configuration
+camera:
+  model: "Canon R6"
+  sensor:
+    width: 36.0   # mm
+    height: 24.0  # mm
+  lens:
+    type: "RF 24-105mm"
+    focal_length: 24.0  # mm (fixed at widest)
+  fov:
+    horizontal: 73.7  # degrees
+    vertical: 53.4   # degrees
+  working_distance:
+    min: 2.0   # meters1
+    max: 6.0   # meters
+
+# Transform Parameters
+transform:
+  # camera_frame: "camera_depth_optical_framek"  # RealSense camera frame
+  camera_frame: "camera_color_optical_frame"  # RealSense camera frame
+  # base_frame: "base_link"  
+  base_frame: "base_footprint"             # Robot base frame
+  map_frame: "map"                      # World coordinate frame
+  tf_timeout: 0.5                       # seconds
+  map_origin: [0.0, 0.0, 0.0]          # [x, y, z] in meters
+
+# Visualization Parameters
+visualization:
+  max_range: 8.0           # Maximum range to display (meters)
+  update_rate: 10.0        # Hz
+  show_transforms: true    # Show coordinate frames
+  show_fov: true          # Show camera FOV
+  colors:
+    human: '#4ECDC4'      # Cyan for humans
+    robot: '#FF6B6B'      # Red for robot
+    robot_heading: '#FF8888'  # Light red for heading
+    axes: '#FFFFFF'       # White for axes
+    background: '#282C34' # Dark background
+    fov: '#66CC66'       # Green for camera FOV
+
+# Debug Parameters
+debug:
+  print_transforms: true     # Print transform information
+  print_positions: true      # Print human positions
+  print_clusters: true
+
+#Movement
+movement:
+  wait_time: 10
+  distance_threshold: 0.1 #10cm
+  orientation_threshold: 5 # radints 

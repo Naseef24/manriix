@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>opencv_tools</name>
+  <version>0.0.0</version>
+  <description>Basic OpenCV-ROS1 nodes</description>
+  <maintainer email="automaticaddison@todo.todo">automaticaddison</maintainer>
+  <license>Apache License 2.0</license>
+
+  <!-- Required buildtool dependency -->
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <!-- ROS1 dependencies -->
+  <depend>rospy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>cv_bridge</depend>
+  <depend>tf</depend>
+  <depend>std_msgs</depend>
+  
+  <!-- Additional dependencies -->
+  <depend>python3-opencv</depend>
+  <depend>python3-scipy</depend>
+
+  <!-- Testing dependencies -->
+  <test_depend>python3-pytest</test_depend>
+  <test_depend>flake8</test_depend>
+</package>

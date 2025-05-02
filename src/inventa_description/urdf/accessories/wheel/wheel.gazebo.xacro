@@ -1,0 +1,73 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <material name="black"><color rgba="0.15 0.15 0.15 1.0" /></material> 
+  <xacro:macro name="wheel_gazebo_v0" params="prefix">
+
+    <!-- <gazebo reference="${prefix}_wheel_link">
+      <material>Gazebo/Black</material>
+      <turnGravityOff>false</turnGravityOff>
+      <selfCollide>false</selfCollide>
+      <mu1 value="0.5"/>
+      <mu2 value="0.5"/>
+      <kp value="10000000.0" />
+      <kd value="1" />
+      <fdir1 value="1 0 0"/>
+    </gazebo> -->
+
+    <!-- Updated Gazebo properties for wheel links -->
+    <gazebo reference="rfl_wheel_link">
+      <material>Gazebo/DarkGrey</material>
+      <mu1>1.5</mu1>
+      <mu2>1.5</mu2>
+      <kp>10000000.0</kp>
+      <kd>1.0</kd>
+      <fdir1>1 0 0</fdir1>
+      <maxVel>100.0</maxVel>
+      <minDepth>0.001</minDepth>
+      <selfCollide>false</selfCollide>
+      <gravity>true</gravity>
+    </gazebo>
+
+
+    <gazebo reference="rfr_wheel_link">
+      <material>Gazebo/DarkGrey</material>
+      <mu1>1.5</mu1>
+      <mu2>1.5</mu2>
+      <kp>10000000.0</kp>
+      <kd>1.0</kd>
+      <fdir1>1 0 0</fdir1>
+      <maxVel>100.0</maxVel>
+      <minDepth>0.001</minDepth>
+      <selfCollide>false</selfCollide>
+      <gravity>true</gravity>
+    </gazebo>
+
+    <gazebo reference="ffl_wheel_link">
+      <material>Gazebo/DarkGrey</material>
+      <mu1>1.5</mu1>
+      <mu2>1.5</mu2>
+      <kp>10000000.0</kp>
+      <kd>1.0</kd>
+      <fdir1>1 0 0</fdir1>
+      <maxVel>100.0</maxVel>
+      <minDepth>0.001</minDepth>
+      <selfCollide>false</selfCollide>
+      <gravity>true</gravity>
+    </gazebo>
+
+    <gazebo reference="ffr_wheel_link">
+      <material>Gazebo/DarkGrey</material>
+      <mu1>1.5</mu1>
+      <mu2>1.5</mu2>
+      <kp>10000000.0</kp>
+      <kd>1.0</kd>
+      <fdir1>1 0 0</fdir1>
+      <maxVel>100.0</maxVel>
+      <minDepth>0.001</minDepth>
+      <selfCollide>false</selfCollide>
+      <gravity>true</gravity>
+    </gazebo>
+
+  </xacro:macro>
+</robot>

@@ -1,0 +1,49 @@
+<launch>
+  <master auto="start"/>
+  <!-- MAP SERVER -->
+  <!-- <arg name="map_file" default="$(find inventa_navigation)/maps/inventa_race.yaml"/> -->
+  <arg name="map_file" default="/home/nsf24/inventa_sim/hospital.yaml"/>
+  <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)">
+    <param name="frame_id" value="map" />
+  </node>
+
+  <!-- AMCL -->
+  <include file="$(find inventa_navigation)/launch/amcl_demo.launch"/>
+
+  <!-- MOVE BASE -->
+  <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+    <!-- COST MAP -->
+    <rosparam file="$(find inventa_navigation)/params/costmap_common_params.yaml" command="load" ns="global_costmap" />
+    <rosparam file="$(find inventa_navigation)/params/costmap_common_params.yaml" command="load" ns="local_costmap" />
+
+    <rosparam file="$(find inventa_navigation)/params/odom_nav_params/global_costmap_params.yaml" command="load" />
+    <rosparam file="$(find inventa_navigation)/params/odom_nav_params/local_costmap_params.yaml" command="load" />
+
+    <rosparam file="$(find inventa_navigation)/params/map_nav_params/local_costmap_params.yaml" command="load" />
+    <rosparam file="$(find inventa_navigation)/params/map_nav_params/global_costmap_params.yaml" command="load" />
+
+    <!-- BASE GLOBAL PLANNER -->
+    <!-- <rosparam file="$(find inventa_navigation)/config/planner/global/navfn_planner.yaml" command="load" /> -->
+    <rosparam file="$(find inventa_navigation)/config/planner/global/global_planner.yaml" command="load" />
+
+    <!-- BASE LOCAL PLANNER -->
+    <rosparam file="$(find inventa_navigation)/config/planner/local/teb_planner.yaml" command="load" />
+    <!-- <rosparam file="$(find inventa_navigation)/config/planner/local/trajectory_planner.yaml" command="load" /> -->
+    <!-- <rosparam file="$(find inventa_navigation)/config/planner/local/dwa_planner.yaml" command="load" />     -->
+    <!-- RECOVERY -->
+    <rosparam file="$(find inventa_navigation)/config/planner/recovery_behaviors.yaml" command="load"/>
+
+    <!-- MOVE BASE -->
+    <param name="controller_frequency" value="15.0" />
+    <param name="controller_patience" value="15.0" />
+    <param name="max_planning_retries" value="10" />
+    <param name="oscillation_timeout" value="3.0" />
+    <param name="clearing_rotation_allowed" value="true" />
+
+    <!-- remap cmd_vel topic for gazebo -->
+    <remap from="cmd_vel" to="/four_wheel_steering_controller/cmd_vel"/>
+    <remap from="odom" to="odometry/filtered"/>
+  </node>
+
+  <node name="rviz" pkg="rviz" type="rviz" required="true" args="-d $(find inventa_navigation)/maps/default.rviz" />
+</launch>

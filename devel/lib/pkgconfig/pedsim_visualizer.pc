@@ -1,0 +1,8 @@
+prefix=/home/nsf24/inventa_sim/devel
+
+Name: pedsim_visualizer
+Description: Description of pedsim_visualizer
+Version: 0.1.0
+Cflags: -I/home/nsf24/inventa_sim/devel/include -I/home/nsf24/inventa_sim/src/pedsim_ros_with_gazebo/pedsim_visualizer/include
+Libs: -L${prefix}/lib 
+Requires: geometry_msgs pedsim_msgs pedsim_utils roscpp rospy std_msgs visualization_msgs dynamic_reconfigure

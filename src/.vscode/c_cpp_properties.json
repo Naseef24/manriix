@@ -1,0 +1,31 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/nsf24/inventa_ws/devel/include/**",
+        "/usr/local/include/**",
+        "/opt/ros/noetic/include/**",
+        "/home/nsf24/inventa_ws/src/rtabmap_ros/rtabmap_conversions/include/**",
+        "/home/nsf24/inventa_ws/src/rtabmap_ros/rtabmap_costmap_plugins/include/**",
+        "/home/nsf24/inventa_ws/src/rtabmap_ros/rtabmap_odom/include/**",
+        "/home/nsf24/inventa_ws/src/rtabmap_ros/rtabmap_rviz_plugins/include/**",
+        "/home/nsf24/inventa_ws/src/rtabmap_ros/rtabmap_slam/include/**",
+        "/home/nsf24/inventa_ws/src/rtabmap_ros/rtabmap_sync/include/**",
+        "/home/nsf24/inventa_ws/src/rtabmap_ros/rtabmap_util/include/**",
+        "/home/nsf24/inventa_ws/src/rtabmap_ros/rtabmap_viz/include/**",
+        "/home/nsf24/inventa_ws/src/teleop_twist_joy/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

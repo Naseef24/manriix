@@ -1,0 +1,40 @@
+<!-- <?xml version="1.0" ?> -->
+<launch> 
+  <arg name="scan_topic" default="front/scan" /> 
+ 
+  <!--- Run gmapping -->
+  <include file="$(find inventa_navigation)/launch/include/gmapping.launch">
+    <arg name="scan_topic"    value="$(arg scan_topic)" />
+  </include>
+
+  <!--- Run Move Base -->
+  <include file="$(find inventa_navigation)/launch/include/move_base.launch" />
+
+  <!-- rviz -->
+  <param name="use_gui" value="true"/>
+  <arg name="config" default="robot" />
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find inventa_viz)/rviz/gmapping.rviz" />  
+
+  <!-- docking to charger-1 -->
+  <!-- <node pkg="inventa_navigation" type="get_coords.py" name="robot_listener" output="screen"/>
+  <node pkg="inventa_dock" type="navigate_to_charging_dock.py" name="charging_dock_navigator" output="screen"/> -->
+
+  <!-- docking to charger-2 -->
+  <!-- <node pkg="inventa_navigation" type="get_coords.py" name="robot_listener" output="screen"/>
+  <node pkg="inventa_dock" type="navigate_to_charging_dock_v2.py" name="charging_dock_navigator" output="screen"/>
+  <node pkg="inventa_dock" type="map_to_base_link_transform.py" name="map_to_base_link_transform"/>   -->
+
+  <!-- docking to charger-3 -->
+  <!-- <node pkg="inventa_navigation" type="get_coords.py" name="robot_listener" output="screen"/>
+  <node pkg="inventa_dock" type="navigate_to_charging_dock_v3.py" name="charging_dock_navigator" output="screen"/>
+  <node pkg="inventa_dock" type="map_to_base_link_transform.py" name="map_to_base_link_transform"/>
+  <node pkg="inventa_dock" type="base_link_to_aruco_marker_transform.py" name="base_link_aruco_marker_frame_listener"/> -->
+
+  <!-- docking to charger-4 -->
+  <node pkg="inventa_navigation" type="get_coords.py" name="robot_listener" output="screen"/>
+  <node pkg="inventa_dock" type="navigate_to_charging_dock_v4.py" name="charging_dock_navigator" output="screen"/>
+  <node pkg="inventa_dock" type="map_to_base_link_transform.py" name="map_to_base_link_transform"/>
+  <node pkg="inventa_dock" type="base_link_to_aruco_marker_transform.py" name="base_link_aruco_marker_frame_listener"/>
+  <node pkg="inventa_dock" type="aruco_marker_detector.py" name="aruco_node"/>
+
+</launch> 

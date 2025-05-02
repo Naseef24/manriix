@@ -1,0 +1,14 @@
+roslaunch inventa_dock hospital_world_connect_to_charging_dock.launch
+
+roslaunch inventa_dock hospital_world_connect_to_charging_dock_v2.launch
+
+
+rostopic pub /battery_status sensor_msgs/BatteryState '{voltage: 9.0, percentage: 1.0, power_supply_status: 3}' 
+
+CTRL + C
+
+rostopic pub /battery_status sensor_msgs/BatteryState '{voltage: 2.16, percentage: 0.24, power_supply_status: 3}' 
+
+CTRL + C
+
+rostopic pub /battery_status sensor_msgs/BatteryState '{voltage: 2.16, percentage: 0.24, power_supply_status: 1}' 

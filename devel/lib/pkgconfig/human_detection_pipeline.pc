@@ -1,0 +1,8 @@
+prefix=/home/nsf24/inventa_sim/devel
+
+Name: human_detection_pipeline
+Description: Description of human_detection_pipeline
+Version: 0.0.0
+Cflags: -I/home/nsf24/inventa_sim/devel/include
+Libs: -L${prefix}/lib 
+Requires: 

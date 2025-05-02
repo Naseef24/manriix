@@ -1,0 +1,844 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This URDF was automatically created by SolidWorks to URDF Exporter! Originally created by Stephen Brawner (brawner@gmail.com) 
+     Commit Version: 1.6.0-4-g7f85cfe  Build Version: 1.6.7995.38578
+     For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
+<robot
+  name="HypeR_V11.0">
+  <link
+    name="base_link">
+    <inertial>
+      <origin
+        xyz="-0.00022681935372234 -0.000800649185682789 0.145661758815116"
+        rpy="0 0 0" />
+      <mass
+        value="82.5664462293819" />
+      <inertia
+        ixx="4.09090247763855"
+        ixy="0.000300906679705125"
+        ixz="-0.0236080265681051"
+        iyy="3.5245611241935"
+        iyz="-0.00359068125563336"
+        izz="1.88439733973081" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/base_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/base_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <link
+    name="front_left_steering_link">
+    <inertial>
+      <origin
+        xyz="-1.57700011105266E-08 0.017771657974776 -0.0633173398496827"
+        rpy="0 0 0" />
+      <mass
+        value="0.100460748703192" />
+      <inertia
+        ixx="7.38843401640206E-05"
+        ixy="-2.54056401915825E-11"
+        ixz="8.06331271884883E-12"
+        iyy="6.93858309803759E-05"
+        iyz="3.0923884662944E-06"
+        izz="3.7553939909728E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/front_left_steering_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/front_left_steering_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="front_left_steering_joint"
+    type="revolute">
+    <origin
+      xyz="0.1745 0.26918 -0.3674"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="front_left_steering_link" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-0.784"
+      upper="0.784"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+  <link
+    name="ffl_wheel_link">
+    <inertial>
+      <origin
+        xyz="1.12826809700595E-07 -0.0314018632270847 -7.65016510556604E-09"
+        rpy="0 0 0" />
+      <mass
+        value="1.69371739361095" />
+      <inertia
+        ixx="0.00408404580749503"
+        ixy="1.86300949273915E-09"
+        ixz="1.05957185498474E-09"
+        iyy="0.00778098437096061"
+        iyz="-5.31778983561498E-13"
+        izz="0.00408407123774502" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/ffl_wheel_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/ffl_wheel_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ffl_wheel_joint"
+    type="continuous">
+    <origin
+      xyz="0 0.1102 -0.096517"
+      rpy="0 0 0" />
+    <parent
+      link="front_left_steering_link" />
+    <child
+      link="ffl_wheel_link" />
+    <axis
+      xyz="0 -1 0" />
+    <limit
+      lower="-3.14"
+      upper="3.14"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+  <link
+    name="front_right_steering_link">
+    <inertial>
+      <origin
+        xyz="-4.15395906561145E-09 -0.0222302750960114 -0.0965169342769011"
+        rpy="0 0 0" />
+      <mass
+        value="0.0593773950834461" />
+      <inertia
+        ixx="6.04128658740703E-05"
+        ixy="3.21406009025469E-21"
+        ixz="-2.9085837908711E-21"
+        iyy="5.6720904490946E-05"
+        iyz="-9.9966716696172E-21"
+        izz="2.14180175360711E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/front_right_steering_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/front_right_steering_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="front_right_steering_joint"
+    type="revolute">
+    <origin
+      xyz="0.1745 -0.26918 -0.3674"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="front_right_steering_link" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-0.784"
+      upper="0.784"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+  <link
+    name="ffr_wheel_link">
+    <inertial>
+      <origin
+        xyz="-1.12826132797617E-07 0.0314018632275217 -7.65236964767047E-09"
+        rpy="0 0 0" />
+      <mass
+        value="1.69371739366651" />
+      <inertia
+        ixx="0.00408404580767643"
+        ixy="1.86301052538417E-09"
+        ixz="-1.05964074958545E-09"
+        iyy="0.00778098437109594"
+        iyz="5.17034115092719E-13"
+        izz="0.0040840712377006" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/ffr_wheel_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/ffr_wheel_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="ffr_wheel_joint"
+    type="continuous">
+    <origin
+      xyz="0 -0.1102 -0.096517"
+      rpy="0 0 0" />
+    <parent
+      link="front_right_steering_link" />
+    <child
+      link="ffr_wheel_link" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-3.14"
+      upper="3.14"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+  <link
+    name="back_left_steering_link">
+    <inertial>
+      <origin
+        xyz="-1.57700011660378E-08 0.0177716579747841 -0.0633173398496465"
+        rpy="0 0 0" />
+      <mass
+        value="0.100460748703193" />
+      <inertia
+        ixx="7.38843401640207E-05"
+        ixy="-2.54056401737522E-11"
+        ixz="8.06331281763687E-12"
+        iyy="6.9385830980376E-05"
+        iyz="3.09238846629451E-06"
+        izz="3.75539399097281E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/back_left_steering_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/back_left_steering_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="back_left_steering_joint"
+    type="revolute">
+    <origin
+      xyz="-0.1745 0.26918 -0.3674"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="back_left_steering_link" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-0.784"
+      upper="0.784"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+  <link
+    name="rfl_wheel_link">
+    <inertial>
+      <origin
+        xyz="1.12826721659909E-07 -0.0314018632274516 -7.65309077221943E-09"
+        rpy="0 0 0" />
+      <mass
+        value="1.69371739361846" />
+      <inertia
+        ixx="0.00408404580760985"
+        ixy="1.86300844930736E-09"
+        ixz="1.05962865255626E-09"
+        iyy="0.00778098437091712"
+        iyz="-5.14772614253646E-13"
+        izz="0.00408407123758739" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/rfl_wheel_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/rfl_wheel_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="rfl_wheel_joint"
+    type="continuous">
+    <origin
+      xyz="0 0.1102 -0.096517"
+      rpy="0 0 0" />
+    <parent
+      link="back_left_steering_link" />
+    <child
+      link="rfl_wheel_link" />
+    <axis
+      xyz="0 -1 0" />
+    <limit
+      lower="-3.14"
+      upper="3.14"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+  <link
+    name="back_right_steering_link">
+    <inertial>
+      <origin
+        xyz="1.57700152936258E-08 -0.017771657974782 -0.0633173398496666"
+        rpy="0 0 0" />
+      <mass
+        value="0.100460748703192" />
+      <inertia
+        ixx="7.38843401640204E-05"
+        ixy="-2.54056401320431E-11"
+        ixz="-8.06331269837118E-12"
+        iyy="6.93858309803758E-05"
+        iyz="-3.09238846629444E-06"
+        izz="3.75539399097279E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/back_right_steering_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/back_right_steering_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="back_right_steering_joint"
+    type="revolute">
+    <origin
+      xyz="-0.1745 -0.26918 -0.3674"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="back_right_steering_link" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-0.784"
+      upper="0.784"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+  <link
+    name="rfr_wheel_link">
+    <inertial>
+      <origin
+        xyz="-1.12824986353566E-07 0.0314018632271391 -7.65165292931913E-09"
+        rpy="0 0 0" />
+      <mass
+        value="1.69371739365844" />
+      <inertia
+        ixx="0.00408404580768048"
+        ixy="1.86301455088153E-09"
+        ixz="-1.05963619637128E-09"
+        iyy="0.00778098437107562"
+        iyz="5.18922243558456E-13"
+        izz="0.00408407123767543" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/rfr_wheel_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/rfr_wheel_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="rfr_wheel_joint"
+    type="continuous">
+    <origin
+      xyz="0 -0.1102 -0.096517"
+      rpy="0 0 0" />
+    <parent
+      link="back_right_steering_link" />
+    <child
+      link="rfr_wheel_link" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-3.14"
+      upper="3.14"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+  <link
+    name="link_5">
+    <inertial>
+      <origin
+        xyz="-0.0747757238758732 -8.86028013052931E-06 0.124017320594753"
+        rpy="0 0 0" />
+      <mass
+        value="4.25630572354445" />
+      <inertia
+        ixx="0.103800801597125"
+        ixy="-0.000143079010178542"
+        ixz="0.00699350360640593"
+        iyy="0.0917874724041398"
+        iyz="3.74208752465415E-05"
+        izz="0.0939290344485906" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/link_5.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/link_5.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="joint_5"
+    type="continuous">
+    <origin
+      xyz="0.0079992 0 0.82103"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="link_5" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-3.14"
+      upper="3.14"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+  <link
+    name="link_6">
+    <inertial>
+      <origin
+        xyz="0.0772448807455917 -0.0830071382020309 0.0540874477862003"
+        rpy="0 0 0" />
+      <mass
+        value="0.3" />
+      <inertia
+        ixx="0.00153179899938534"
+        ixy="0.000830876140153737"
+        ixz="-0.000834999428959931"
+        iyy="0.00184806119539999"
+        iyz="0.000581785736654228"
+        izz="0.00213962887492674" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/link_6.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.694117647058824 0.0980392156862745 0.0980392156862745 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/link_6.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="joint_6"
+    type="revolute">
+    <origin
+      xyz="-0.14482 0 0.08258"
+      rpy="0 0 0" />
+    <parent
+      link="link_5" />
+    <child
+      link="link_6" />
+    <axis
+      xyz="-0.81915 0 -0.57358" />
+    <limit
+      lower="-0.784"
+      upper="0.784"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+  <link
+    name="link_7">
+    <inertial>
+      <origin
+        xyz="-0.00585307273293229 0.100055201974169 0.00725551115474676"
+        rpy="0 0 0" />
+      <mass
+        value="2.0867338198957" />
+      <inertia
+        ixx="0.00436597743197753"
+        ixy="-0.00119627981171305"
+        ixz="-8.78647411666114E-05"
+        iyy="0.0125630403374383"
+        iyz="-0.000163953066671734"
+        izz="0.0133932312096404" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/link_7.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/link_7.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="joint_7"
+    type="revolute">
+    <origin
+      xyz="0.15625 -0.11228 0.10941"
+      rpy="0 0 0" />
+    <parent
+      link="link_6" />
+    <child
+      link="link_7" />
+    <axis
+      xyz="0 -1 0" />
+    <limit
+      lower="-0.784"
+      upper="0.784"
+      effort="1000"
+      velocity="3.14" />
+  </joint>
+  <link
+    name="rplidar_link">
+    <inertial>
+      <origin
+        xyz="-0.000565056922980089 -1.49350247278246E-05 0.0142986178892645"
+        rpy="0 0 0" />
+      <mass
+        value="0.16538353203642" />
+      <inertia
+        ixx="7.88653130827605E-05"
+        ixy="4.84727391749444E-08"
+        ixz="2.18472968897183E-06"
+        iyy="7.51902501485825E-05"
+        iyz="2.88704831277006E-08"
+        izz="0.000109946805568617" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/rplidar_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/rplidar_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="rplidar_joint"
+    type="fixed">
+    <origin
+      xyz="0.332 0 -0.27344"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="rplidar_link" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="realsense_link">
+    <inertial>
+      <origin
+        xyz="-0.00116668467860909 0.000186997637605935 0.00117046704068602"
+        rpy="0 0 0" />
+      <mass
+        value="0.0548642766404321" />
+      <inertia
+        ixx="6.91739903782249E-05"
+        ixy="-1.01263949691459E-08"
+        ixz="-2.90761492035062E-08"
+        iyy="4.15219213201891E-06"
+        iyz="3.483587358225E-09"
+        izz="6.60156825037727E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/realsense_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/realsense_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="realsense_joint"
+    type="fixed">
+    <origin
+      xyz="0.2005 0 0.72354"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="realsense_link" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="unitreelidar_link">
+    <inertial>
+      <origin
+        xyz="0.171374004662087 -0.00179792944415741 -0.52905741418743"
+        rpy="0 0 0" />
+      <mass
+        value="123.259702749081" />
+      <inertia
+        ixx="23.6620237808753"
+        ixy="0.0897839893092859"
+        ixz="0.164533996112027"
+        iyy="24.3606540377781"
+        iyz="0.0445918140451257"
+        izz="7.98401418474383" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/unitreelidar_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HypeR_V11.0/meshes/unitreelidar_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="unitreelidar_joint"
+    type="fixed">
+    <origin
+      xyz="-0.177 0 0.70445"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="unitreelidar_link" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+</robot>

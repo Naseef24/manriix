@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">  
+  <xacro:macro name="sus_gazebo_v0" params="prefix">
+    <!-- <gazebo reference="${prefix}_sus_link">
+      <selfCollide>false</selfCollide>
+      <material>Gazebo/White</material>
+      <mu1>0.5</mu1>
+      <mu2>0.5</mu2>
+      <kp>10000000.0</kp>
+      <kd>1.0</kd>
+      <selfCollide>false</selfCollide>
+      <gravity>true</gravity>
+    </gazebo> -->
+      <!-- Updated Gazebo properties for mid links -->
+    <gazebo reference="front_left_mid_link">
+      <material>Gazebo/White</material>
+      <mu1>0.5</mu1>
+      <mu2>0.5</mu2>
+      <kp>10000000.0</kp>
+      <kd>1.0</kd>
+      <selfCollide>false</selfCollide>
+      <gravity>true</gravity>
+    </gazebo>
+
+    <gazebo reference="front_right_mid_link">
+      <material>Gazebo/White</material>
+      <mu1>0.5</mu1>
+      <mu2>0.5</mu2>
+      <kp>10000000.0</kp>
+      <kd>1.0</kd>
+      <selfCollide>false</selfCollide>
+      <gravity>true</gravity>
+    </gazebo>
+
+    <gazebo reference="rear_left_mid_link">
+      <material>Gazebo/White</material>
+      <mu1>0.5</mu1>
+      <mu2>0.5</mu2>
+      <kp>10000000.0</kp>
+      <kd>1.0</kd>
+      <selfCollide>false</selfCollide>
+      <gravity>true</gravity>
+    </gazebo>
+
+    <gazebo reference="rear_right_mid_link">
+      <material>Gazebo/White</material>
+      <mu1>0.5</mu1>
+      <mu2>0.5</mu2>
+      <kp>10000000.0</kp>
+      <kd>1.0</kd>
+      <selfCollide>false</selfCollide>
+      <gravity>true</gravity>
+    </gazebo>
+
+  </xacro:macro>
+</robot>

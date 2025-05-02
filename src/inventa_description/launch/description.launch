@@ -1,0 +1,109 @@
+<launch>
+  <arg name="config" default="base" />
+  <!-- fix for oneweek project -->
+  <arg name="env_runner" value="$(eval 'env_run' if not optenv('OS', 'unknown').lower().startswith('windows') else 'env_run.bat')" />
+  <!-- the following seems to work too when in devel space, but not in install_isolated -->
+  <!-- <arg name="env_runner" value="env_run" /> -->
+
+  <!-- argument for imu use -->
+  <arg name="imu_enable" default="true" />  
+  <!-- argument for gps use -->
+  <arg name="gps_enable" default="true" />  
+  <!-- argument for ultrasonic use -->
+  <arg name="ultrasonic_enable" default="true" />
+
+  <!-- arguments for model, rviz and gui -->
+  <!-- inventa_scan.urdf.xacro -->
+  <!-- robot.urdf.xacro -->
+  <!-- robot_v8.urdf.xacro -->
+  <!-- robot_v11.urdf.xacro -->
+
+  <arg name="model" default="$(find inventa_description)/urdf/robot_v11.urdf.xacro
+                            imu_enable:=$(arg imu_enable)
+                            gps_enable:=$(arg gps_enable)
+                            ultrasonic_enable:=$(arg ultrasonic_enable)" />
+
+  <param name="robot_description"
+         command="$(find inventa_description)/scripts/$(arg env_runner)
+                    $(find inventa_description)/urdf/configs/$(arg config)
+                    $(find xacro)/xacro $(find inventa_description)/urdf/robot_v11.urdf.xacro
+                    --inorder" />
+                    
+  <!-- Run a python script to the send a service call to gazebo_ros to spawn a URDF robot -->
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" respawn="false" output="screen">
+    <!-- <remap from="/joint_states" to="/inventa/joint_states" /> -->
+  </node>
+
+  <!-- Send fake joint values-->
+<!-- <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
+  <param name="use_gui" value="false"/>
+</node>   -->
+
+<!-- ========================================================================================= -->
+<!-- Realsense_d455_camera -->
+<!-- Convert depth image to laser scan -->
+  <!-- Convert depth image to laser scan -->
+    <node name="depthimage_to_laserscan1" pkg="depthimage_to_laserscan" type="depthimage_to_laserscan" output="screen">
+      <remap from="image" to="/camera/depth/image_raw"/>
+      <remap from="camera_info" to="/camera/depth/camera_info"/>
+      <remap from="scan" to="/realsense_scan"/>
+      <param name="range_min" type="double" value="0.45"/>
+      <param name="range_max" type="double" value="10.0"/>
+      <param name="scan_height" type="int" value="100"/>
+      <param name="output_frame_id" type="str" value="camera_depth_frame"/>
+    </node>
+
+    <node name="depthimage_to_laserscan2" pkg="depthimage_to_laserscan" type="depthimage_to_laserscan" output="screen">
+      <remap from="image" to="/camera2/depth/image_raw2"/>
+      <remap from="camera_info" to="/camera2/depth/camera_info2"/>
+      <remap from="scan" to="/realsense_scan2"/>
+      <param name="range_min" type="double" value="0.45"/>
+      <param name="range_max" type="double" value="10.0"/>
+      <param name="scan_height" type="int" value="100"/>
+      <param name="output_frame_id" type="str" value="camera2_depth_frame"/>
+    </node>
+
+  <!-- unitree points to laser scan conversion -->
+
+  <!-- <node pkg="pointcloud_to_laserscan" type="pointcloud_to_laserscan_node" name="pointcloud_to_laserscan">
+    <remap from="cloud_in" to="/unitree_lidar_l1/points"/>
+    <remap from="scan" to="/unitree_scan"/>
+    <param name="target_frame" value="unitree_lidar"/>
+    <param name="min_height" value="0.05"/>
+    <param name="max_height" value="1.0"/>
+  </node> -->
+
+  <!-- Sonar to laser scan conversion -->
+
+  <!-- <node pkg="sonar_to_laserscan" type="sonar_to_laserscan_node" name="sonar_to_laserscan">
+    <rosparam>
+      min_range: 0.05
+      max_range: 20.0
+      field_of_view: 0.5
+      output_frame_id: base_link
+      sonar_topics: ["/sonar_1", "/sonar_2", "/sonar_3", "/sonar_4", "/sonar_5", "/sonar_6"]
+      output_topic: /sonar_scan
+      rate: 10.0
+    </rosparam>
+  </node> -->
+  
+  <!-- Laser scan fusion node -->
+<!-- 
+  <node pkg="ira_laser_tools" type="laserscan_multi_merger" name="laserscan_multi_merger" output="screen">
+    <param name="destination_frame" value="base_footprint"/>
+    <param name="cloud_destination_topic" value="/merged_cloud"/>
+    <param name="scan_destination_topic" value="/scan_multi"/>
+    <param name="laserscan_topics" value ="/front/scan /realsense_scan" />
+    <param name="laserscan_topics" value ="/front/scan /unitree_scan /realsense_scan" />
+  </node> -->
+
+<!-- point cloud fusion -->
+
+  <!-- Concatenate the point clouds -->
+  <!-- <node name="point_cloud_fusion" pkg="inventa_project" type="point_cloud_fusion_node" output="screen">
+    <param name="velodyne_frame" value="velodyne" />
+    <param name="realsense_frame" value="camera_depth_optical_frame" />
+  </node> -->
+  <!-- ============================================================================================== -->
+
+</launch>

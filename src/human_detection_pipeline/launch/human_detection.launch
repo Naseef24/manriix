@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+
+<launch>
+    <!-- Start RealSense camera -->
+    <!-- <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+        <arg name="enable_color" value="true"/>
+        <arg name="enable_depth" value="true"/>
+        <arg name="depth_width" value="640"/>
+        <arg name="depth_height" value="480"/>
+        <arg name="color_width" value="640"/>
+        <arg name="color_height" value="480"/>
+        <arg name="align_depth" value="true"/>
+    </include> -->
+
+    <!-- Start human detection node -->
+    <node name="human_detection_node" pkg="human_detection_pipeline" type="human_detection_node.py" output="screen">
+        <param name="config_path" value="$(find human_detection_pipeline)/config/config.yaml"/>
+    </node>
+     <!-- Launch the clustering node -->
+    <node pkg="human_clustering_pipeline" type="human_clustering_node.py" name="human_clustering_node" output="screen">
+        <param name="config_path" value="$(find human_clustering_pipeline)/config/config.yaml"/>
+    </node>
+    <!-- <node pkg="human_clustering_pipeline" type="human_clustering_node_old.py" name="human_clustering_node" output="screen">
+        <param name="config_path" value="$(find human_clustering_pipeline)/config/config.yaml"/>
+    </node> -->
+</launch>

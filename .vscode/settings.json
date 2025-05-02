@@ -1,0 +1,15 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/nsf24/inventa_sim/devel/lib/python3/dist-packages",
+        "/home/nsf24/catkin_ws/devel/lib/python3/dist-packages",
+        "/home/nsf24/inventa_ws/devel/lib/python3/dist-packages",
+        "/opt/ros/noetic/lib/python3/dist-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/nsf24/inventa_sim/devel/lib/python3/dist-packages",
+        "/home/nsf24/catkin_ws/devel/lib/python3/dist-packages",
+        "/home/nsf24/inventa_ws/devel/lib/python3/dist-packages",
+        "/opt/ros/noetic/lib/python3/dist-packages"
+    ],
+    "cmake.sourceDirectory": "/home/nsf24/inventa_sim/src/inventa_navigation"
+}
