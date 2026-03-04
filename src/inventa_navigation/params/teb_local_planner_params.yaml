@@ -48,8 +48,6 @@ TebLocalPlannerROS:
   # Prevents control_look_ahead_poses to look within this many poses of the goal in order to prevent overshoot & oscillation when xy_goal_tolerance is very small
   #prevent_look_ahead_poses_near_goal:
 
-
-
   # ViaPoints
 
   # Min. separation between each two consecutive via-points extracted from the global plan [if negative: disabled]
@@ -64,19 +62,19 @@ TebLocalPlannerROS:
   # Robot
   
   # Maximum velocity in the x direction of the robot. May be overruled by the max_vel_trans parameter
-  max_vel_x: 1.0 #0.5
+  max_vel_x: 0.5
 
   # Maximum translational velocity of the robot for driving backwards
   max_vel_x_backwards: 0.5
 
   # Maximum angular velocity of the robot
-  max_vel_theta: 0.8 #0.3
+  max_vel_theta: 0.3
 
   # Maximum translational acceleration of the robot
-  acc_lim_x: 1.0 #0.2
+  acc_lim_x: 0.2
 
   # Maximum angular acceleration of the robot
-  acc_lim_theta: 1.0 #0.1
+  acc_lim_theta: 0.1
 
   # If true, updated the footprint before checking trajectory feasibility
   is_footprint_dynamic: False
@@ -123,7 +121,7 @@ TebLocalPlannerROS:
   # GoalTolerance
   
   # Allowed final euclidean distance to the goal position   
-  xy_goal_tolerance: 0.5 # Original 0.5, 0.2 also good
+  xy_goal_tolerance: 0.2 #0.5 Original 0.5, 0.2 also good
 
   # Allowed final orientation error to the goal orientation
   yaw_goal_tolerance: 0.2
@@ -143,7 +141,7 @@ TebLocalPlannerROS:
   # Obstacles
 
   # Minimum desired separation from obstacles
-  min_obstacle_dist: 0.2 # This value must also include our robot radius, since footprint_model is set to "point".
+  min_obstacle_dist: 0.5 #0.2 # This value must also include our robot radius, since footprint_model is set to "point".
 
   # Buffer zone around obstacles with non-zero penalty costs (should be larger than min_obstacle_dist in order to take effect)   
   inflation_dist: 0.6
@@ -231,7 +229,7 @@ TebLocalPlannerROS:
   weight_kinematics_forward_drive: 1000.0 # Original 1.0, [ 700 makes the robot to rotate in place] https://answers.ros.org/question/322151/can-teb-perform-rotations-in-place-on-differential-drive-bases/
   
   # Optimization weight for enforcing a minimum turning radius (carlike robots)
-  weight_kinematics_turning_radius: 1.0
+  weight_kinematics_turning_radius: 0.0 #1.0
 
   # Optimization weight for contracting the trajectory w.r.t. transition time
   weight_optimaltime: 0.1 # must be > 0

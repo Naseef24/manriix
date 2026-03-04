@@ -1,32 +1,39 @@
 DWAPlannerROS:
   # Robot configuration parameters  
   acc_lim_x: 2.5
-  acc_lim_y: 2.5
+  acc_lim_y: 0.0 #2.5
   acc_lim_th: 3.2
 
-  max_trans_vel: 0.55
-  min_trans_vel: 0.1
+  # max_trans_vel: 0.5 #0.55
+  # min_trans_vel: 0.1
+  max_vel_trans: 0.55
+  min_vel_trans: 0.1
 
   max_vel_x: 0.55
-  min_vel_x: 0.0 #-0.25 #The minimum x velocity for the robot in m/s, negative for backwards motion.
+  min_vel_x: -0.05 #0.0 #The minimum x velocity for the robot in m/s, negative for backwards motion.
 
-  max_vel_y: 0.1
-  min_vel_y: -0.1
+  max_vel_y: 0.0 #0.1 for Holonomic
+  min_vel_y: 0.0 #-0.1 for Holonomic
 
-  max_rot_vel: 1.0 #0.4
-  min_rot_vel: 0.4
+  # max_rot_vel: 5.0 #1.0 
+  # min_rot_vel: 0.4
+  max_vel_theta: 1.0 
+  min_vel_theta: 0.4
+
+  # rot_stopped_vel: 0.4
+  theta_stopped_vel: 0.4
 
   # Goal Tolerance Parameters
-  yaw_goal_tolerance: 0.05 #0.3
-  xy_goal_tolerance: 0.10 #0.5
+  yaw_goal_tolerance: 0.05 
+  xy_goal_tolerance: 0.10
   latch_xy_goal_tolerance: false
 
   # # Forward Simulation Parameters
-  sim_time: 1.7 #2.0
-  sim_granularity: 0.025 #0.02
-  vx_samples: 3 #10
+  sim_time: 1.7
+  sim_granularity: 0.025 
+  vx_samples: 3 
   vy_samples: 10
-  vtheta_samples: 30
+  vtheta_samples: 20
   # penalize_negative_x: true
   #~<name>/controller_frequency (double, default: 20.0)
 # The frequency at which this controller will be called in Hz. Uses searchParam to read the parameter from parent namespaces if not set in the namespace of the controller. For use with move_base, this means that you only need to 
@@ -36,10 +43,10 @@ DWAPlannerROS:
   path_distance_bias: 32.0 # The weighting for how much the controller should stay close to the path it was given
   goal_distance_bias: 24.0 # The weighting for how much the controller should attempt to reach its local goal, also controls speed
 
-  occdist_scale: 0.01 #0.5         # The weighting for how much the controller should attempt to avoid obstacles
+  occdist_scale: 0.01         # The weighting for how much the controller should attempt to avoid obstacles
   forward_point_distance: 0.325 #0.5 # The distance from the center point of the robot to place an additional scoring point, in meters
 
-  stop_time_buffer: 0.2 #3.0     # The amount of time that the robot must stThe absolute value of the veolicty at which to start scaling the
+  stop_time_buffer: 3.0     # The amount of time that the robot must stThe absolute value of the veolicty at which to start scaling the
                             # robot's footprint, in m/sop before a collision in order for a trajectory to be considered valid in seconds
   scaling_speed: 0.25     # The absolute value of the veolicty at which to start scaling the robot's footprint, in m/s
   max_scaling_factor: 0.2 # The maximum factor to scale the robot's footprint by
@@ -59,6 +66,6 @@ DWAPlannerROS:
 # the robot moves 1 meter past them.
 
   # Debugging
-  # publish_traj_pc : true
-  # publish_cost_grid_pc: true
-  # global_frame_id: odom
+  publish_traj_pc : true
+  publish_cost_grid_pc: true
+  global_frame_id: odom

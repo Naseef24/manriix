@@ -1,0 +1,9 @@
+<launch>
+  <!-- Launch the main robot -->
+  <include file="$(find inventa_gazebo)/launch/inventa_world.launch.py">
+    <arg name="ultrasonic_enable" value="true"/>
+  </include>
+  
+  <!-- Launch sonar interface -->
+  <include file="$(find inventa_sonar)/launch/sonar.launch" />
+</launch>

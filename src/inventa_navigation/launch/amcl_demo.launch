@@ -1,21 +1,33 @@
 <launch>
 
-    <arg name="use_map_topic" default="false"/>
-    <arg name="scan_topic" default="front/scan" />  
-    <!-- <arg name="scan_topic" default="scan_multi" />   -->
-    
-    <!-- Map server -->
-    <!-- <arg name="map_file" default="$(find inventa_navigation)/maps/map1.yaml"/> -->
-    <arg name="map_file" default="/home/nsf24/inventa_sim/hospital.yaml"/>
-
-    <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" />
+  <arg name="use_map_topic" default="false"/>
+  <arg name="scan_topic" default="front/scan" />  
+  <!-- <arg name="scan_topic" default="scan_multi" />   -->
   
-    <include file="$(find inventa_navigation)/launch/include/amcl.launch">
-      <arg name="use_map_topic" value="$(arg use_map_topic)" />
-      <arg name="scan_topic"    value="$(arg scan_topic)" />
-    </include>  
+  <!-- Map server -->
+  <!-- <arg name="map_file" default="$(find inventa_navigation)/maps/map1.yaml"/> -->
+  <arg name="map_file" default="$(find inventa_navigation)/maps/hospital.yaml"/>
 
-    <!--- Run Move Base --> 
-    <include file="$(find inventa_navigation)/launch/include/move_base.launch"/>
+  <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" />
 
-  </launch>
+  <include file="$(find inventa_navigation)/launch/include/amcl.launch">
+    <arg name="use_map_topic" value="$(arg use_map_topic)" />
+    <arg name="scan_topic"    value="$(arg scan_topic)" />
+  </include>  
+
+  <!--- Run Move Base --> 
+  <include file="$(find inventa_navigation)/launch/include/move_base.launch"/>
+
+  <!-- rviz -->
+  <param name="use_gui" value="true"/>
+  <arg name="config" default="robot" />
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find inventa_viz)/rviz/localization.rviz" />  
+
+  <!-- docking to charger-4 -->
+  <node pkg="inventa_navigation" type="get_coords.py" name="robot_listener" output="screen"/>
+  <node pkg="inventa_dock" type="navigate_to_charging_dock_v4.py" name="charging_dock_navigator" output="screen"/>
+  <node pkg="inventa_dock" type="map_to_base_link_transform.py" name="map_to_base_link_transform"/>
+  <node pkg="inventa_dock" type="base_link_to_aruco_marker_transform.py" name="base_link_aruco_marker_frame_listener"/>
+  <node pkg="inventa_dock" type="aruco_marker_detector.py" name="aruco_node"/>
+
+</launch>

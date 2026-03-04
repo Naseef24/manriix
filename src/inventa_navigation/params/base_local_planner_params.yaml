@@ -24,7 +24,7 @@ TrajectoryPlannerROS:
   # Goal tolerance
   yaw_goal_tolerance: 0.05 #0.1
   xy_goal_tolerance: 0.10
-  latch_xy_goal_tolerance: true #false #true
+  latch_xy_goal_tolerance: false #true
     # If goal tolerance is latched, if the robot ever reaches the goal xy location
     # it will simply rotate in place, even if it ends up outside the goal tolerance while it is doing so. 
     # - New in navigation 1.3.1

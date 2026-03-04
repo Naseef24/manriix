@@ -1,13 +1,14 @@
 <launch>
     <arg name="use_map_topic"  default="false"/>
     <arg name="scan_topic"     default="front/scan"/>
+    <arg name="set_init_to_zero"     default="false"/>
 
   
     <node pkg="amcl" type="amcl" name="amcl">
       <param name="use_map_topic"             value="$(arg use_map_topic)"/>
-      <!-- Changed odom_model_type to omni for four-wheel steering -->
-      <!-- <param name="odom_model_type"           value="omni"/> -->
-      <param name="odom_model_type"           value="diff-corrected"/>
+      <!-- Changed odom_model_type to diff-corrected for four-wheel steering -->
+      <!-- <param name="odom_model_type" value="omni"/> -->
+      <param name="odom_model_type" value="diff-corrected"/>
       <param name="odom_alpha5" value="0.1"/>
       <param name="gui_publish_rate" value="10.0"/>
       <param name="laser_max_beams" value="720"/>
@@ -54,9 +55,10 @@
       <!-- <param name="initial_pose_x" value="0.0" />
       <param name="initial_pose_y" value="0.0" />
       <param name="initial_pose_a" value="0.0" /> -->
-      <param name="initial_pose_x" value="0.0" />
-      <param name="initial_pose_y" value="2.0" />
-      <param name="initial_pose_a" value="2.5" />      
+
+      <param name="initial_pose_x" value="0.0" if="$(arg set_init_to_zero)"/>
+      <param name="initial_pose_y" value="0.0" if="$(arg set_init_to_zero)"/>
+      <param name="initial_pose_a" value="0.0" if="$(arg set_init_to_zero)"/>      
 
       <!-- When set to true, AMCL will subscribe to the map topic rather than making a service call to receive its map.-->
       <param name="receive_map_topic" value="true"/>

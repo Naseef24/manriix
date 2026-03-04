@@ -79,7 +79,7 @@ class ConnectToChargingDockNavigator:
         self.obstacle_tolerance = 0.5 #0.22
 
         # Center offset tolerance in pixels
-        self.center_offset_tolerance = 10
+        self.center_offset_tolerance = 20 #10
         
         # Undocking distance
         self.undocking_distance = 0.50
@@ -124,7 +124,7 @@ class ConnectToChargingDockNavigator:
         
         self.move_base_client.send_goal(move_base_goal)
         
-        # Wait for result
+        # Wait for result (5 minutes)
         if self.move_base_client.wait_for_result(rospy.Duration(300)):
             result_state = self.move_base_client.get_state()
             

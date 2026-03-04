@@ -32,7 +32,7 @@ class FrameListener:
         rospy.init_node('map_base_link_frame_listener')
         
         # Get target frame parameter or use default
-        self.target_frame = rospy.get_param('~target_frame', 'base_link')
+        self.target_frame = rospy.get_param('~target_frame', 'base_footprint')
         self.reference_frame = 'map'
         
         # Set up TF listener

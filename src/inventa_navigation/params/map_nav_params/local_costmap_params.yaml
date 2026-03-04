@@ -3,7 +3,7 @@
 local_costmap:
 
   #Set the global and robot frames for the costmap
-  global_frame: map #odom 
+  global_frame: odom # map
   robot_base_frame: base_footprint
 
   #Set the update and publish frequency of the costmap
@@ -13,13 +13,14 @@ local_costmap:
   #We'll configure this costmap to be a rolling window... meaning it is always centered at the robot
   static_map: false
   rolling_window: true
-  width: 2.0
-  height: 2.0
+  width: 4.0 #2.0
+  height: 4.0 #2.0
   resolution: 0.050000
   transform_tolerance: 0.1
 
 
-  # plugins:
-  #   - {name: obstacle_layer, type: "costmap_2d::VoxelLayer"} 
-  #   - {name: inflater_layer, type: "costmap_2d::InflationLayer"}
+  plugins:
+    - {name: obstacle_layer, type: "costmap_2d::ObstacleLayer"} 
+    # - {name: obstacle_layer, type: "costmap_2d::VoxelLayer"} 
+    - {name: inflater_layer, type: "costmap_2d::InflationLayer"}
 

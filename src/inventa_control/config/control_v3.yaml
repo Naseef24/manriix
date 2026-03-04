@@ -22,10 +22,10 @@ swerve_controller:
     min_steering_angle: -1.58 #-0.5238 #-0.7854 #-1.58
     max_steering_angle: 1.58 #0.5238 #0.7854 #1.58
 
-    track: 0.75               # Distance between left and right wheels (75 cm)
-    wheel_steering_y_offset: 0.085  # Offset from wheel center to steering axis (8.5 cm)
-    wheel_radius: 0.101       # Wheel radius (keep current value if correct)
-    wheel_base: 0.365         # Distance between front and rear axles (36.5 cm)
+    track: 0.6975 #0.75               # Distance between left and right wheels (75 cm) (in simulation: 697.5mm)
+    wheel_steering_y_offset: 0.0791 #0.085  # Offset from wheel center to steering axis (8.5 cm) (in simulation: 79.1mm)
+    wheel_radius: 0.101       # Wheel radius (keep current value if correct) 
+    wheel_base: 0.349 #0.365         # Distance between front and rear axles (36.5 cm) (in simulation: 349mm)
 
     # Other
     publish_rate: 50

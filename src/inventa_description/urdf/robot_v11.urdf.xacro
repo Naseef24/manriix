@@ -823,7 +823,7 @@
     </joint>
     <actuator name="front_left_servo_motor">
       <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
-      <mechanicalReduction>4</mechanicalReduction>
+      <mechanicalReduction>2.5</mechanicalReduction>
     </actuator>
   </transmission>  
   
@@ -835,7 +835,7 @@
     </joint>
     <actuator name="front_right_servo_motor">
       <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
-      <mechanicalReduction>4</mechanicalReduction>
+      <mechanicalReduction>2.5</mechanicalReduction>
     </actuator>
   </transmission>
   
@@ -846,7 +846,7 @@
     </joint>
     <actuator name="back_left_servo_motor">
       <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
-      <mechanicalReduction>4</mechanicalReduction>
+      <mechanicalReduction>2.5</mechanicalReduction>
     </actuator>
   </transmission>
   
@@ -857,7 +857,7 @@
     </joint>
     <actuator name="back_right_servo_motor">
       <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
-      <mechanicalReduction>4</mechanicalReduction>
+      <mechanicalReduction>2.5</mechanicalReduction>
     </actuator>
   </transmission>
 <!-- ==============================Wheel==============================================================   -->
