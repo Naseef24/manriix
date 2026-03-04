@@ -1,0 +1,18 @@
+laser_filter:
+  ros__parameters:
+    filter1:
+      type: laser_filters/LaserScanRangeFilter
+      name: range_filter
+      params:
+        lower_threshold: 0.32
+        upper_threshold: 30.0
+        lower_replacement_value: .inf
+        upper_replacement_value: .inf
+
+# laser_filter:
+#   ros__parameters:
+#     filter1:
+#       type: laser_filters/LaserScanAngularBoundsFilter
+#       name: angular_bounds_filter
+#       lower_angle: -1.5708
+#       upper_angle: 1.5708

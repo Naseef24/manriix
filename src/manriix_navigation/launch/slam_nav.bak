@@ -1,0 +1,169 @@
+    
+
+# #!/usr/bin/env python3
+# """
+# Manriix SLAM + Navigation Launch File
+# Combines SLAM Toolbox (mapping) with Nav2 (navigation)
+# Use for exploration - navigate while building map
+# Nav2 Goal Pose WORKS in this mode!
+
+# 3D Perception Options:
+#   use_3d_perception:=false  - Default, uses only RPLidar (current behavior)
+#   use_3d_perception:=true   - Enables STVL with ZED camera depth for 3D obstacle detection
+#                               (cliffs, overhead obstacles, full 3D awareness)
+
+# Examples:
+#   # Standard 2D mode (default)
+#   ros2 launch manriix_navigation slam_nav.launch.py
+
+#   # 3D mode with front camera
+#   ros2 launch manriix_navigation slam_nav.launch.py use_3d_perception:=true
+
+#   # 3D mode with all cameras (override params file)
+#   ros2 launch manriix_navigation slam_nav.launch.py use_3d_perception:=true \
+#       nav2_params_3d_file:=/path/to/nav2_params_3d_full.yaml
+# """
+# import os
+# from launch import LaunchDescription
+# from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable, LogInfo
+# from launch.substitutions import LaunchConfiguration, PythonExpression
+# from launch.launch_description_sources import PythonLaunchDescriptionSource
+# from launch_ros.actions import Node
+# from ament_index_python.packages import get_package_share_directory
+# from launch.conditions import IfCondition, UnlessCondition
+
+# def generate_launch_description():
+    
+#     # Get package directories
+#     nav_pkg = get_package_share_directory('manriix_navigation')
+#     nav2_bringup_pkg = get_package_share_directory('nav2_bringup')
+   
+#     # Launch configurations
+#     use_sim_time = LaunchConfiguration('use_sim_time')
+#     slam_params_file = LaunchConfiguration('slam_params_file')
+#     nav2_params_file = LaunchConfiguration('nav2_params_file')
+#     nav2_params_3d_file = LaunchConfiguration('nav2_params_3d_file')
+#     use_rviz = LaunchConfiguration('use_rviz')
+#     use_3d_perception = LaunchConfiguration('use_3d_perception')
+
+#     return LaunchDescription([        
+#         # Enable colored output
+#         SetEnvironmentVariable('RCUTILS_COLORIZED_OUTPUT', '1'),
+#         SetEnvironmentVariable('RCUTILS_CONSOLE_OUTPUT_FORMAT', '[{severity}] [{name}]: {message}'),
+
+#         # ==================== ARGUMENTS ====================
+#         DeclareLaunchArgument(
+#             'use_sim_time',
+#             default_value='false',
+#             description='Use simulation time'),
+        
+#         DeclareLaunchArgument(
+#             'slam_params_file',
+#             default_value=os.path.join(nav_pkg, 'config', 'slam_toolbox_config.yaml'),
+#             description='Full path to SLAM Toolbox parameters file'),
+        
+#         DeclareLaunchArgument(
+#             'nav2_params_file',
+#             default_value=os.path.join(nav_pkg, 'config', 'nav2', 'nav2_params.yaml'),
+#             description='Full path to Nav2 parameters file (2D mode - default)'),
+
+#         DeclareLaunchArgument(
+#             'nav2_params_3d_file',
+#             default_value=os.path.join(nav_pkg, 'config', 'nav2', 'nav2_params_3d.yaml'),
+#             description='Full path to Nav2 parameters file (3D mode with STVL)'),
+
+#         DeclareLaunchArgument(
+#             'use_rviz',
+#             default_value='false',
+#             description='Whether to start RViz'),
+
+#         DeclareLaunchArgument(
+#             'use_3d_perception',
+#             default_value='false',
+#             description='Enable 3D perception with STVL (ZED cameras for cliff/overhead detection)'),
+
+#         # ==================== INFO MESSAGES ====================
+#         LogInfo(
+#             condition=UnlessCondition(use_3d_perception),
+#             msg='\n' + '='*60 + '\n' +
+#                 '[MANRIIX NAV] Starting in 2D MODE\n' +
+#                 '  - RPLidar obstacle detection only\n' +
+#                 '  - No cliff/overhead detection\n' +
+#                 '='*60
+#         ),
+#         LogInfo(
+#             condition=IfCondition(use_3d_perception),
+#             msg='\n' + '='*60 + '\n' +
+#                 '[MANRIIX NAV] Starting in 3D MODE\n' +
+#                 '  - RPLidar + ZED STVL enabled\n' +
+#                 '  - Cliff detection: ENABLED\n' +
+#                 '  - Overhead obstacle detection: ENABLED\n' +
+#                 '='*60
+#         ),
+
+#         # ==================== SLAM TOOLBOX ====================
+#         # Provides: /map topic, map→odom transform
+#         # Used in BOTH modes (2D map is still needed for global planning)
+#         Node(
+#             package='slam_toolbox',
+#             executable='async_slam_toolbox_node',
+#             name='slam_toolbox',
+#             output='screen',
+#             parameters=[
+#                 slam_params_file,
+#                 {'use_sim_time': use_sim_time}
+#             ]
+#         ),
+
+#         # ==================== VISUALIZATION ====================
+#         # RViz
+#         Node(
+#             package='rviz2',
+#             executable='rviz2',
+#             name='rviz2',
+#             output='screen',
+#             arguments=['-d', os.path.join(nav_pkg, 'rviz', 'nav2.rviz')],
+#             parameters=[{'use_sim_time': use_sim_time}],
+#             condition=IfCondition(use_rviz)),
+
+#         # ==================== NAV2 STACK (2D MODE - DEFAULT) ====================
+#         # Uses standard obstacle layer with RPLidar only
+#         # This is the EXISTING behavior
+#         IncludeLaunchDescription(
+#             PythonLaunchDescriptionSource(
+#                 os.path.join(nav2_bringup_pkg, 'launch', 'navigation_launch.py')
+#             ),
+#             launch_arguments={
+#                 'use_sim_time': use_sim_time,
+#                 'params_file': nav2_params_file,
+#                 'autostart': 'true',
+#             }.items(),
+#             condition=UnlessCondition(use_3d_perception)
+#         ),
+
+#         # ==================== NAV2 STACK (3D MODE - OPTIONAL) ====================
+#         # Uses STVL layer with ZED cameras for 3D obstacle detection
+#         # Enabled with: use_3d_perception:=true
+#         IncludeLaunchDescription(
+#             PythonLaunchDescriptionSource(
+#                 os.path.join(nav2_bringup_pkg, 'launch', 'navigation_launch.py')
+#             ),
+#             launch_arguments={
+#                 'use_sim_time': use_sim_time,
+#                 'params_file': nav2_params_3d_file,
+#                 'autostart': 'true',
+#             }.items(),
+#             condition=IfCondition(use_3d_perception)
+#         ),
+
+#         # ==================== POSE PUBLISHER ====================
+#         # Publishes robot pose in map frame for web interface
+#         # Converts TF (map→base_link) to topic /robot_pose_map
+#         Node(
+#             package='manriix_mission',
+#             executable='pose_publisher',
+#             name='pose_publisher',
+#             output='screen',
+#             parameters=[{'use_sim_time': use_sim_time}]
+#         ),
+#     ])

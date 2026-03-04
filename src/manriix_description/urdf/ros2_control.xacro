@@ -1,0 +1,130 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- 
+    Hardware mode argument:
+    - mock: Mock hardware for testing without any hardware
+    - gazebo: Gazebo Classic simulation
+    - ignition: Ignition Gazebo (Fortress) simulation  
+    - real: Real hardware (CubeMars + Zltech motors)
+  -->
+  <xacro:arg name="hardware_mode" default="mock"/>
+
+  <xacro:macro name="manriix_ros2_control" params="hardware_mode">
+
+    <ros2_control name="manriix_control" type="system">
+      
+      <!-- ========== HARDWARE PLUGIN SELECTION ========== -->
+      <hardware>
+        <xacro:if value="${hardware_mode == 'mock'}">
+          <plugin>mock_components/GenericSystem</plugin>
+          <param name="calculate_dynamics">true</param>
+        </xacro:if>
+
+        <xacro:if value="${hardware_mode == 'gazebo'}">
+          <plugin>gazebo_ros2_control/GazeboSystem</plugin>
+        </xacro:if>
+
+        <xacro:if value="${hardware_mode == 'ignition'}">
+          <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+        </xacro:if>
+
+        <xacro:if value="${hardware_mode == 'real'}">
+          <plugin>manriix_hardware/ManriixSystem</plugin>
+          <param name="can_interface">can2</param>
+          <param name="cubemars_base_id">1</param>
+          <param name="zltech_driver1_id">0x601</param>
+          <param name="zltech_driver2_id">0x602</param>
+        </xacro:if>
+      </hardware>
+
+      <!-- ========== STEERING JOINTS (position control) ========== -->
+      
+      <joint name="steering_front_left_joint">
+        <command_interface name="position">
+          <param name="min">-0.785</param>
+          <param name="max">0.785</param>
+        </command_interface>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </joint>
+
+      <joint name="steering_front_right_joint">
+        <command_interface name="position">
+          <param name="min">-0.785</param>
+          <param name="max">0.785</param>
+        </command_interface>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </joint>
+
+      <joint name="steering_rear_left_joint">
+        <command_interface name="position">
+          <param name="min">-0.785</param>
+          <param name="max">0.785</param>
+        </command_interface>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </joint>
+
+      <joint name="steering_rear_right_joint">
+        <command_interface name="position">
+          <param name="min">-0.785</param>
+          <param name="max">0.785</param>
+        </command_interface>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </joint>
+
+      <!-- ========== WHEEL JOINTS (velocity control) ========== -->
+
+      <joint name="wheel_front_left_joint">
+        <command_interface name="velocity"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </joint>
+
+      <joint name="wheel_front_right_joint">
+        <command_interface name="velocity"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </joint>
+
+      <joint name="wheel_rear_left_joint">
+        <command_interface name="velocity"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </joint>
+
+      <joint name="wheel_rear_right_joint">
+        <command_interface name="velocity"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </joint>
+
+    </ros2_control>
+
+    <!-- ========== GAZEBO PLUGIN (for simulation only) ========== -->
+    <xacro:if value="${hardware_mode == 'gazebo'}">
+      <gazebo>
+        <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
+          <robot_param>robot_description</robot_param>
+          <robot_param_node>robot_state_publisher</robot_param_node>
+          <parameters>$(find manriix_gazebo)/config/manriix_gazebo_controllers.yaml</parameters>
+        </plugin>
+      </gazebo>
+    </xacro:if>
+
+    <xacro:if value="${hardware_mode == 'ignition'}">
+      <gazebo>
+        <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+          <robot_param>robot_description</robot_param>
+          <robot_param_node>robot_state_publisher</robot_param_node>
+          <parameters>$(find manriix_gazebo)/config/manriix_gazebo_controllers.yaml</parameters>
+        </plugin>
+      </gazebo>
+    </xacro:if>
+
+  </xacro:macro>
+
+</robot>

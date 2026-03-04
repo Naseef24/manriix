@@ -1,0 +1,188 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 50
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    manriix_4ws_controller:
+      type: manriix_controller/Manriix4WSController
+
+joint_state_broadcaster:
+  ros__parameters:
+    joints:
+      - wheel_front_left_joint
+      - wheel_front_right_joint
+      - wheel_rear_left_joint
+      - wheel_rear_right_joint
+      - steering_front_left_joint
+      - steering_front_right_joint
+      - steering_rear_left_joint
+      - steering_rear_right_joint
+
+manriix_4ws_controller:
+  ros__parameters:
+    # max_steering_rate: 3.0    # 2.0 default
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Joint names (must match URDF)
+    # ═══════════════════════════════════════════════════════════════════════════
+    front_left_wheel_joint: wheel_front_left_joint
+    front_right_wheel_joint: wheel_front_right_joint
+    rear_left_wheel_joint: wheel_rear_left_joint
+    rear_right_wheel_joint: wheel_rear_right_joint
+    
+    front_left_steering_joint: steering_front_left_joint
+    front_right_steering_joint: steering_front_right_joint
+    rear_left_steering_joint: steering_rear_left_joint
+    rear_right_steering_joint: steering_rear_right_joint
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Vehicle geometry (meters)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # wheelbase: 0.349
+    # track_width: 0.53836
+    # wheel_radius: 0.101
+    # steering_offset: 0.085
+    wheelbase: 0.44 #0.365
+    track_width: 0.635 #0.75
+    wheel_radius: 0.101
+    steering_offset: 0.085
+
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Velocity limits
+    # ═══════════════════════════════════════════════════════════════════════════
+    # max_linear_velocity: 1.667
+    # max_angular_velocity: 3.14
+    # max_linear_acceleration: 1.0
+    # max_angular_acceleration: 1.0
+
+    max_linear_velocity: 0.8 #1.5 #1.667
+    max_angular_velocity: 1.2 #1.0 #2.0 #3.14
+    max_linear_acceleration: 0.6 #0.5 #1.0
+    max_angular_acceleration: 2.0 #0.8 #1.0
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Steering limits
+    # ═══════════════════════════════════════════════════════════════════════════    
+    max_steering_angle: 0.785
+    max_steering_rate: 3.0 #2.0
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Safety
+    # ═══════════════════════════════════════════════════════════════════════════
+    cmd_vel_timeout: 0.5
+    velocity_threshold: 0.01
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Angle scaling (reduces aggressive steering)
+    # ═══════════════════════════════════════════════════════════════════════════
+    enable_angle_scaling: true
+    max_scaled_angle: 0.26 #0.21 #0.15 #8.6 degrees(0.15) #12 degrees(0.21 radians) #15 degrees(0.26 radians) to allow more aggressive steering while still preventing oversteer
+    angle_scale_factor: 0.7
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Odometry settings
+    # ═══════════════════════════════════════════════════════════════════════════
+    base_frame_id: base_footprint
+    odom_frame_id: odom
+    enable_odom_tf: false #true #false #true
+    publish_rate: 50.0
+
+# controller_manager:
+#   ros__parameters:
+#     update_rate: 100  # Hz
+
+#     # Controllers to load
+#     joint_state_broadcaster:
+#       type: joint_state_broadcaster/JointStateBroadcaster
+
+#     manriix_4ws_controller:
+#       type: manriix_4ws_controller/Manriix4WSController
+
+
+# # Joint State Broadcaster config
+# joint_state_broadcaster:
+#   ros__parameters:
+#     publish_rate: 50.0
+
+
+# # Manriix 4WS Controller config
+# manriix_4ws_controller:
+#   ros__parameters:
+#     # Joint names (must match URDF)
+#     wheel_front_left_joint: wheel_front_left_joint
+#     front_right_wheel_joint: wheel_front_right_joint
+#     rear_left_wheel_joint: wheel_rear_left_joint
+#     rear_right_wheel_joint: wheel_rear_right_joint
+    
+#     front_left_steering_joint: steering_front_left_joint
+#     front_right_steering_joint: steering_front_right_joint
+#     rear_left_steering_joint: steering_rear_left_joint
+#     rear_right_steering_joint: steering_rear_right_joint
+    
+#     # Vehicle geometry (meters)
+#     # wheelbase: 0.349
+#     # track_width: 0.538
+#     # wheel_radius: 0.096
+#     # steering_offset: 0.0
+#     wheelbase: 0.365
+#     track_width: 0.75
+#     wheel_radius: 0.101
+#     steering_offset: 0.085
+
+#     # Velocity limits
+#     # max_linear_velocity: 1.5
+#     # max_angular_velocity: 3.14
+#     # max_linear_acceleration: 1.0
+#     # max_angular_acceleration: 1.0
+#     max_linear_velocity: 0.5 #1.667
+#     max_angular_velocity: 0.5 #3.14
+#     max_linear_acceleration: 1.0
+#     max_angular_acceleration: 1.0
+
+#     # Steering limits
+#     max_steering_angle: 0.785   # 45 degrees
+#     max_steering_rate: 2.0      # rad/s
+    
+#     # Safety
+#     cmd_vel_timeout: 0.5
+#     velocity_threshold: 0.01
+    
+#     # Odometry
+#     base_frame_id: base_footprint
+#     odom_frame_id: odom
+#     enable_odom_tf: false #true
+#     publish_rate: 50.0
+
+
+          # ### Understanding the YAML:
+          # ```
+          # ┌─────────────────────────────────────────────────────────────────────────┐
+          # │                         YAML STRUCTURE                                  │
+          # ├─────────────────────────────────────────────────────────────────────────┤
+          # │                                                                         │
+          # │  controller_manager:                                                    │
+          # │    ros__parameters:                                                     │
+          # │      update_rate: 100          ← Control loop runs at 100 Hz            │
+          # │                                                                         │
+          # │      joint_state_broadcaster:                                           │
+          # │        type: joint_state_broadcaster/JointStateBroadcaster              │
+          # │              ▲                                                          │
+          # │              └── Plugin name (from ros2_controllers)                    │
+          # │                                                                         │
+          # │      manriix_4ws_controller:                                            │
+          # │        type: manriix_4ws_controller/Manriix4WSController                │
+          # │              ▲                                                          │
+          # │              └── Plugin name (from our XML file!)                       │
+          # │                                                                         │
+          # ├─────────────────────────────────────────────────────────────────────────┤
+          # │                                                                         │
+          # │  manriix_4ws_controller:                                                │
+          # │    ros__parameters:                                                     │
+          # │      wheelbase: 0.349          ← Read by get_parameter("wheelbase")     │
+          # │      track_width: 0.538                                                 │
+          # │      ...                                                                │
+          # │                                                                         │
+          # └─────────────────────────────────────────────────────────────────────────┘

@@ -1,0 +1,143 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# EKF Configuration for Manriix 4WS Robot
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Uses robot_localization package for sensor fusion
+# Tested: 2025-02-15 — working with SLAM Toolbox mapping, no drift/shaking
+#
+# Sensors:
+#   odom0: Wheel odometry  → x, y, vx, vyaw (translation + yaw velocity)
+#   imu0:  ZED X Front IMU → roll, pitch, yaw, vroll, vpitch, vyaw (all rotation)
+#
+# Design decisions:
+#   - Wheel odom does NOT fuse absolute yaw — this caused shaking because
+#     wheel yaw and IMU yaw fought each other during turns on the 4WS robot.
+#   - Wheel odom DOES fuse vyaw — gives the EKF two yaw velocity sources
+#     (wheel + IMU gyro) to cross-check, improving turn responsiveness.
+#   - IMU owns all absolute orientation (roll, pitch, yaw).
+#   - Only front ZED X IMU is used — multiple IMUs at different positions
+#     produce conflicting readings due to vibration and centripetal acceleration.
+#   - IMU data is axis-corrected in direct_zed_detection_node.py _imu_loop()
+#     from ZED SDK RIGHT_HANDED_Y_UP to ROS RIGHT_HANDED_Z_UP.
+#
+# References:
+#   - robot_localization docs: http://docs.ros.org/en/noetic/api/robot_localization/html/configuring_robot_localization.html
+#   - Nav2 setup guide: https://docs.nav2.org/setup_guides/odom/setup_robot_localization.html
+# ═══════════════════════════════════════════════════════════════════════════════
+
+ekf_filter_node:
+  ros__parameters:
+    # ═══════════════════════════════════════════════════════════════════════════
+    # General Settings
+    # ═══════════════════════════════════════════════════════════════════════════
+    frequency: 50.0
+    two_d_mode: true          # Ground robot — constrains z, roll, pitch
+
+    # Frame IDs
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_footprint
+    world_frame: odom         # EKF operates in odom frame (SLAM provides map→odom)
+
+    # TF
+    publish_tf: true          # Publishes odom → base_footprint
+    publish_acceleration: false
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Sensor 0: Wheel Odometry
+    # Topic: /manriix_4ws_controller/odom
+    # Fuses: x, y, vx, vyaw
+    # Does NOT fuse: yaw (IMU owns absolute heading to prevent yaw fight)
+    # ═══════════════════════════════════════════════════════════════════════════
+    odom0: /manriix_4ws_controller/odom
+    odom0_config: [
+      # x,     y,     z,
+      false,  false,  false,
+      # roll,  pitch, yaw,
+      false, false, false,
+      # vx,    vy,    vz,
+      true,  false, false,
+      # vroll, vpitch, vyaw,
+      false, false, true,
+      # ax,    ay,    az
+      false, false, false
+    ]
+    odom0_queue_size: 10
+    odom0_differential: false
+    odom0_relative: false
+    odom0_nodelay: false
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Sensor 1: IMU from ZED X Front Camera
+    # Topic: /zedx_front/zed_node/imu/data
+    # Fuses: roll, pitch, yaw, vroll, vpitch, vyaw (all rotation)
+    # Note: Axes corrected in direct_zed_detection_node.py _imu_loop()
+    #       ZED SDK Y_UP → ROS Z_UP mapping applied before publishing
+    # ═══════════════════════════════════════════════════════════════════════════
+    imu0: /zedx_front/zed_node/imu/data
+    imu0_config: [
+      # x,     y,     z,
+      false, false, false,
+      # roll,  pitch, yaw,
+      true,  true,  true,
+      # vx,    vy,    vz,
+      false, false, false,
+      # vroll, vpitch, vyaw,
+      true,  true,  true,
+      # ax,    ay,    az
+      false, false, false
+    ]
+    imu0_queue_size: 10
+    imu0_differential: false
+    imu0_relative: true       # Yaw starts from zero, integrates gyro (no magnetometer)
+    imu0_nodelay: false
+    imu0_remove_gravitational_acceleration: true
+
+    # Left/Right ZED X IMUs: Disabled
+    # Multiple IMUs at different positions produce conflicting readings
+    # due to vibration and centripetal acceleration during turns.
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Process Noise Covariance (Q matrix)
+    # How much the state can change between EKF updates
+    # Diagonal: [x, y, z, roll, pitch, yaw, vx, vy, vz, vroll, vpitch, vyaw, ax, ay, az]
+    # ═══════════════════════════════════════════════════════════════════════════
+    process_noise_covariance: [
+      0.05,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.05,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.06,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.03,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.03,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.06,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.025, 0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.025, 0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.04,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.02,  0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.015
+    ]
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Initial Estimate Covariance (P0 matrix)
+    # Very small — we're confident robot starts at origin with zero velocity
+    # ═══════════════════════════════════════════════════════════════════════════
+    initial_estimate_covariance: [
+      1e-9,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   1e-9,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   1e-9,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   1e-9,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   1e-9,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   1e-9,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-9,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-9,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-9,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-9,  0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-9,  0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-9,  0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-9,  0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-9,  0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-9
+    ]

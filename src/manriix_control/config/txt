@@ -1,0 +1,207 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# EKF Configuration for Manriix 4WS Robot
+# Uses robot_localization package for sensor fusion
+# Sensors: Wheel Odometry + ZED X Front IMU
+#
+# VERIFIED AGAINST:
+#   1. robot_localization official config guide (v2.7.7):
+#      http://docs.ros.org/en/noetic/api/robot_localization/html/configuring_robot_localization.html
+#   2. Nav2 First-Time Robot Setup (Odometry + EKF):
+#      https://docs.nav2.org/setup_guides/odom/setup_robot_localization.html
+#   3. Nav2 Setting Up Odometry:
+#      https://navigation.ros.org/setup_guides/odom/setup_odom.html
+#   4. Nav2 VIO Integration Tutorial:
+#      https://docs.nav2.org/tutorials/docs/integrating_vio.html
+#   5. Official Nav2 tutorial sample ekf.yaml:
+#      https://github.com/ros-navigation/navigation2_tutorials/blob/rolling/sam_bot_description/config/ekf.yaml
+#
+# STATUS: WORKING - produces stable SLAM maps with minor self-correcting drift
+#
+# ═══════════════════════════════════════════════════════════════════════════════
+
+ekf_filter_node:
+  ros__parameters:
+    # ═══════════════════════════════════════════════════════════════════════════
+    # General Settings
+    # ═══════════════════════════════════════════════════════════════════════════
+    frequency: 50.0
+    two_d_mode: true
+    # Ref [1]: "set the two_d_mode parameter to true. This effectively zeros
+    #   out the 3D pose variables in every measurement."
+
+    # Transform settings
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_footprint
+    world_frame: odom
+    # Ref [2]: "If you are fusing continuous position data such as wheel
+    #   encoder odometry, visual odometry, or IMU data, set world_frame
+    #   to the value of your odom_frame."
+
+    # TF settings
+    publish_tf: true           # Publish odom → base_footprint
+    publish_acceleration: false
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Sensor 0: Wheel Odometry from 4WS Controller
+    # Topic: /manriix_4ws_controller/odom
+    # ═══════════════════════════════════════════════════════════════════════════
+    #
+    # Current config fuses: x, y, yaw (absolute) + vx, vyaw (velocity)
+    #
+    # ANALYSIS:
+    #   Ref [1] says: "unless your robot is internally using an IMU, wheel
+    #   encoder data generates velocity, heading, and position from the same
+    #   source. In that instance, we don't want to use all the values."
+    #   Their recommended config is: vx, vy, vyaw only (no position, no yaw).
+    #
+    #   However, Ref [3] (Nav2 setup guide) uses a DIFFERENT approach:
+    #   odom0_config: x, y, z, vyaw — position from odom, velocity for yaw.
+    #
+    #   Your current config is a hybrid that works in practice:
+    #   - x, y: absolute position from wheel odom (provides position anchor)
+    #   - yaw: heading from wheel odom (NOTE: also fused from IMU — see below)
+    #   - vx: forward velocity
+    #   - vyaw: angular velocity
+    #
+    # POTENTIAL OPTIMIZATION (for later, NOT now):
+    #   The yaw is fused from BOTH wheel odom AND IMU. Ref [1] warns against
+    #   this as it feeds the same underlying data twice. If you experience
+    #   heading oscillation or jitter, try removing yaw from odom0 and let
+    #   the IMU own it exclusively. But since it's working now, don't change.
+    #
+    # ═══════════════════════════════════════════════════════════════════════════
+    odom0: /manriix_4ws_controller/odom
+    odom0_config: [
+      # x,     y,     z,
+      true,  true,  false,
+      # roll,  pitch, yaw,
+      false, false, true,
+      # vx,    vy,    vz,
+      true,  false, false,
+      # vroll, vpitch, vyaw,
+      false, false, true,
+      # ax,    ay,    az
+      false, false, false
+    ]
+    odom0_queue_size: 10
+    odom0_differential: false
+    odom0_relative: false
+    odom0_nodelay: false
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Sensor 1: IMU from ZED X Front Camera
+    # Topic: /zedx_front/zed_node/imu/data
+    # ═══════════════════════════════════════════════════════════════════════════
+    #
+    # Current config fuses: roll, pitch, yaw + vroll, vpitch, vyaw
+    #
+    # ANALYSIS:
+    #   Ref [3] (Nav2 setup guide) says: "only roll, pitch, and yaw are used.
+    #   Since angular velocity is fused internally to the IMU to provide the
+    #   roll, pitch and yaw estimates, we should not fuse in the angular
+    #   velocities used to derive that information."
+    #
+    #   However, Ref [1] (robot_localization docs, advanced section) shows
+    #   a config that DOES fuse both yaw and vyaw from IMU:
+    #   imu0_config: [false,false,false, false,false,true, false,false,false,
+    #                  false,false,true, true,false,false]
+    #
+    #   Your config fuses angular velocities (vroll, vpitch, vyaw) in addition
+    #   to orientation (roll, pitch, yaw). This works because:
+    #   - two_d_mode: true zeros out roll/pitch anyway
+    #   - The ZED X IMU's angular velocity is measured independently (gyroscope)
+    #     from orientation (fusion of gyro + accel), so they are NOT strictly
+    #     derived from the same source
+    #   - Having vyaw from the IMU gives the filter faster response to turns
+    #
+    #   imu0_relative: true means the first IMU reading becomes the zero
+    #   reference, avoiding initial offset between IMU and odom frames.
+    #
+    # POTENTIAL OPTIMIZATION (for later, NOT now):
+    #   Ref [1] recommends adding ax (forward acceleration) from IMU:
+    #   "fuse the 0 measurement for Y velocity... as a 0 measurement
+    #   indicates the robot cannot ever move in that direction."
+    #   Adding ax can improve responsiveness during acceleration/braking.
+    #   But do NOT add ay — Ref [1]: "the IMU will likely report non-zero,
+    #   noisy values for Y acceleration, which can cause your estimate to
+    #   drift rapidly."
+    #
+    # ═══════════════════════════════════════════════════════════════════════════
+    imu0: /zedx_front/zed_node/imu/data
+    imu0_config: [
+      # x,     y,     z,
+      false, false, false,
+      # roll,  pitch, yaw,
+      true,  true,  true,
+      # vx,    vy,    vz,
+      false, false, false,
+      # vroll, vpitch, vyaw,
+      true,  true,  true,
+      # ax,    ay,    az
+      false, false, false
+    ]
+    imu0_queue_size: 10
+    imu0_differential: false
+    imu0_relative: true
+    imu0_nodelay: false
+    imu0_remove_gravitational_acceleration: true
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Left & Right ZED X IMUs (DISABLED)
+    # ═══════════════════════════════════════════════════════════════════════════
+    #
+    # RATIONALE FOR KEEPING DISABLED:
+    #   Ref [1]: "If there are N sources [of orientation], users can set the
+    #   differential parameter to true for N-1 of them, or simply ensure that
+    #   the covariance values are large enough to eliminate oscillations."
+    #
+    #   Multiple IMUs at different positions on the robot produce conflicting
+    #   orientation readings due to different vibration characteristics and
+    #   centripetal acceleration during turns. One clean IMU source (front,
+    #   closest to center) is better than three noisy ones for a commercial
+    #   deployment.
+    #
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Process Noise Covariance (Q matrix)
+    # ═══════════════════════════════════════════════════════════════════════════
+    process_noise_covariance: [
+      0.05,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.05,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.06,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.03,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.03,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.06,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.025, 0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.025, 0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.04,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.02,  0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.01,  0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.015
+    ]
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Initial Estimate Covariance (P0 matrix)
+    # ═══════════════════════════════════════════════════════════════════════════
+    initial_estimate_covariance: [
+      1e-9,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   1e-9,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   1e-9,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   1e-9,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   1e-9,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   1e-9,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-9,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-9,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-9,  0.0,   0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-9,  0.0,   0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-9,  0.0,   0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-9,  0.0,   0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-9,  0.0,   0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-9,  0.0,
+      0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   0.0,   1e-9
+    ]

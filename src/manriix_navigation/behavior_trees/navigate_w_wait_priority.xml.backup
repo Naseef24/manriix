@@ -1,0 +1,25 @@
+<!--
+  Custom: NEVER skip goals
+  - If path computation fails (goal blocked) → Wait → Retry
+  - If path following fails (obstacle) → Wait → Retry same path
+  - Never give up, wait until goal is accessible
+-->
+<root main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <RecoveryNode number_of_retries="999" name="NavigateRecovery">
+      <Sequence name="NavigateSequence">
+        <!-- Compute path - retry if fails -->
+        <RecoveryNode number_of_retries="999" name="ComputePathRecovery">
+          <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
+          <Wait wait_duration="10"/>
+        </RecoveryNode>
+        <!-- Follow path - retry if blocked -->
+        <RecoveryNode number_of_retries="999" name="FollowPathRecovery">
+          <FollowPath path="{path}" controller_id="FollowPath"/>
+          <Wait wait_duration="10"/>
+        </RecoveryNode>
+      </Sequence>
+      <Wait wait_duration="10"/>
+    </RecoveryNode>
+  </BehaviorTree>
+</root>

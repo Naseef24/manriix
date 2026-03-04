@@ -1,0 +1,173 @@
+# Detection Pipeline Configuration
+# ================================
+# This config allows switching between different detection approaches.
+#
+# Detection Modes:
+#   - 'ROS_WRAPPER': Use zed_ros2_wrapper (existing system, has latency issues)
+#   - 'DIRECT_SDK': Use direct pyzed.sl SDK (hybrid approach, recommended) --> USE
+#
+# For DIRECT_SDK mode, the direct_sdk section controls settings.
+# For ROS_WRAPPER mode, the detection_pipeline setting controls ZED vs YOLO.
+
+# =============================================================================
+# DETECTION MODE SELECTION (PRIMARY SWITCH)
+# =============================================================================
+# Options: 'ROS_WRAPPER' or 'DIRECT_SDK'
+# - DIRECT_SDK: Recommended - uses direct pyzed.sl for fast, stable detection
+# - ROS_WRAPPER: Legacy - uses zed_ros2_wrapper (has latency issues)
+detection_mode: 'DIRECT_SDK'
+
+# =============================================================================
+# DIRECT_SDK MODE SETTINGS (used when detection_mode: 'DIRECT_SDK')
+# =============================================================================
+# This uses direct_zed_detection_node.py with pyzed.sl SDK
+# Bypasses zed_ros2_wrapper for detection, solving latency and jitter issues
+direct_sdk:
+  # Detection model selection
+  # Options:
+  #   - 'YOLO11': Custom YOLO11 model (recommended for person detection)
+  #   - 'ZED_PERSON_FAST': ZED SDK person-specific fast model
+  #   - 'ZED_PERSON_ACCURATE': ZED SDK person-specific accurate model
+  #   - 'ZED_MULTI_CLASS_FAST': ZED SDK multi-class fast model
+  #   - 'ZED_MULTI_CLASS_MEDIUM': ZED SDK multi-class medium model
+  #   - 'ZED_MULTI_CLASS_ACCURATE': ZED SDK multi-class accurate model
+  detection_model: 'YOLO11'
+
+  # YOLO model path (used when detection_model contains 'YOLO')
+  # Available variants: yolo11n.onnx (fastest), yolo11s.onnx (balanced),
+  #                     yolo11m.onnx (accurate), yolo11l.onnx (most accurate)
+  yolo_model_path: '~/models/yolo11/yolo11s.onnx'
+
+  # Camera resolution
+  # Options: 'HD1200', 'HD1080', 'SVGA'
+  resolution: 'HD1080'
+
+  # Depth mode (affects detection accuracy and performance)
+  # Options: 'NEURAL_LIGHT' (fastest), 'NEURAL' (balanced), 'NEURAL_PLUS'
+  depth_mode: 'NEURAL'
+
+  # Camera FPS (frames per second)
+  fps: 15
+
+  # Detection confidence threshold (0-100)
+  # Lower = more detections but more false positives
+  # Higher = fewer detections but more accurate
+  confidence_threshold: 50
+
+  # Image publishing settings for web visualization
+  publish_images: true          # Set false to disable image streaming
+  draw_bounding_boxes: true     # Pre-draw bboxes on images
+  image_scale: 0.5              # Resize factor (0.5 = half size, reduces bandwidth)
+  jpeg_quality: 75              # JPEG compression quality (0-100)
+
+  # Publish rate for ROS2 topics (Hz)
+  publish_rate: 15.0
+
+  # Cluster stability settings
+  stationary_velocity_threshold: 0.5  # m/s - humans below this are "stationary"
+
+# =============================================================================
+# ROS_WRAPPER MODE SETTINGS (used when detection_mode: 'ROS_WRAPPER')
+# =============================================================================
+# This uses the existing zed_fusion_node.py with zed_ros2_wrapper
+# Keep this for fallback if direct SDK has issues
+detection_pipeline: 'YOLO'  # Options: 'ZED_INBUILT' or 'YOLO'
+
+# =============================================================================
+# ZED BUILT-IN DETECTION SETTINGS (for ROS_WRAPPER mode)
+# =============================================================================
+# Used when detection_mode: 'ROS_WRAPPER' AND detection_pipeline: 'ZED_INBUILT'
+# ZED SDK detection models use uppercase class labels: PERSON, VEHICLE, ANIMAL, etc.
+zed_inbuilt:
+  # Labels to detect (uppercase as per ZED SDK)
+  enabled_labels:
+    - 'PERSON'
+    - 'VEHICLE'
+    - 'ANIMAL'
+
+  # Confidence thresholds per class
+  confidence_thresholds:
+    PERSON: 50.0
+    VEHICLE: 60.0
+    ANIMAL: 55.0
+
+  # Default confidence if class not in thresholds
+  default_confidence: 50.0
+
+  # Human detection is primary target
+  human_label: 'PERSON'
+
+# =============================================================================
+# YOLO CUSTOM DETECTION SETTINGS (for ROS_WRAPPER mode)
+# =============================================================================
+# Used when detection_mode: 'ROS_WRAPPER' AND detection_pipeline: 'YOLO'
+# YOLO models use lowercase COCO class names: person, car, dog, etc.
+yolo:
+  # Labels to detect (lowercase COCO names)
+  # Full COCO list: person, bicycle, car, motorcycle, airplane, bus, train, truck,
+  #                 boat, traffic light, fire hydrant, stop sign, parking meter, bench,
+  #                 bird, cat, dog, horse, sheep, cow, elephant, bear, zebra, giraffe,
+  #                 backpack, umbrella, handbag, tie, suitcase, frisbee, skis, snowboard,
+  #                 sports ball, kite, baseball bat, baseball glove, skateboard, surfboard,
+  #                 tennis racket, bottle, wine glass, cup, fork, knife, spoon, bowl,
+  #                 banana, apple, sandwich, orange, broccoli, carrot, hot dog, pizza,
+  #                 donut, cake, chair, couch, potted plant, bed, dining table, toilet,
+  #                 tv, laptop, mouse, remote, keyboard, cell phone, microwave, oven,
+  #                 toaster, sink, refrigerator, book, clock, vase, scissors, teddy bear,
+  #                 hair drier, toothbrush
+  enabled_labels:
+    - 'person'
+
+  # Confidence thresholds per class
+  confidence_thresholds:
+    person: 50.0
+    chair: 60.0
+    tv: 60.0
+    laptop: 60.0
+
+  # Default confidence if class not in thresholds
+  default_confidence: 50.0
+
+  # Human detection mapping (YOLO uses 'person')
+  human_label: 'person'
+
+  # YOLO model selection (for reference - actual model set in ZED config)
+  # Available: yolo11n, yolo11s, yolo11m, yolo11l
+  model_variant: 'yolo11s'
+
+# =============================================================================
+# COMMON DETECTION PARAMETERS (used by both modes)
+# =============================================================================
+common:
+  # Range filtering (meters)
+  min_detection_range: 0.3
+  max_detection_range: 10.0
+
+  # Tracking state acceptance
+  # ZED tracking_state: 0=OFF, 1=OK, 2=SEARCHING, 3=TERMINATE
+  accept_tracking_ok: true        # State 1
+  accept_tracking_searching: true # State 2 (occluded but tracked)
+
+  # Object size constraints (meters)
+  min_object_size: 0.1
+  max_object_size: 3.0
+
+  # Velocity estimation
+  enable_velocity_estimation: true
+  velocity_smoothing_window: 5
+
+# =============================================================================
+# VISUALIZATION OPTIONS (for web interface)
+# =============================================================================
+visualization:
+  # Show all detected objects or only humans
+  show_all_objects: false  # Set true to see chairs, TVs, etc. in visualization
+
+  # Bounding box colors by class (RGB)
+  colors:
+    person: [0, 255, 0]      # Green
+    PERSON: [0, 255, 0]      # Green
+    chair: [255, 165, 0]     # Orange
+    tv: [0, 191, 255]        # Deep sky blue
+    laptop: [255, 0, 255]    # Magenta
+    default: [255, 255, 255] # White

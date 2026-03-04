@@ -1,0 +1,289 @@
+#!/usr/bin/env python3
+"""
+Manriix Complete Photography Robot Launch File
+Combines: Cameras (SDK) + SLAM + Nav2 + Photography Intelligence
+
+This is the MASTER launch file for Terminal 2.
+Terminal 1 should run robot.launch.py with launch_cameras:=false
+
+Architecture:
+  Terminal 1: Hardware + RPLidar only (no cameras)
+  Terminal 2: THIS FILE (cameras + navigation + photography)
+
+Features:
+  - ZED X cameras via direct SDK (low latency)
+  - Human detection with YOLO11
+  - GPU-accelerated clustering
+  - POI management for photography
+  - Mission planning state machine
+  - Nav2 with 3D perception (STVL)
+  - SLAM mapping
+  - Web visualization
+
+Usage:
+  # Standard photography mission
+  ros2 launch manriix_perception complete_photography_robot.launch.py
+
+  # With RViz
+  ros2 launch manriix_perception complete_photography_robot.launch.py use_rviz:=true
+
+  # With web visualization
+  ros2 launch manriix_perception complete_photography_robot.launch.py enable_web_viz:=true
+"""
+
+import os
+from launch import LaunchDescription
+from launch.actions import (
+    DeclareLaunchArgument, 
+    IncludeLaunchDescription, 
+    SetEnvironmentVariable, 
+    LogInfo,
+    GroupAction
+)
+from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch_ros.actions import Node
+from ament_index_python.packages import get_package_share_directory
+from launch.conditions import IfCondition
+
+
+def generate_launch_description():
+    
+    # Get package directories
+    perception_pkg = get_package_share_directory('manriix_perception')
+    nav_pkg = get_package_share_directory('manriix_navigation')
+    
+    # Launch configurations
+    use_sim_time = LaunchConfiguration('use_sim_time')
+    use_rviz = LaunchConfiguration('use_rviz')
+    enable_web_viz = LaunchConfiguration('enable_web_viz')
+    enable_recovery = LaunchConfiguration('enable_recovery')
+    enable_autonomous_navigation = LaunchConfiguration('enable_autonomous_navigation')
+    detection_model = LaunchConfiguration('detection_model')
+    yolo_model_path = LaunchConfiguration('yolo_model_path')
+    confidence_threshold = LaunchConfiguration('confidence_threshold')
+    
+    # Config files
+    photographer_params = os.path.join(perception_pkg, 'config', 'photographer_system_params.yaml')
+    
+    return LaunchDescription([
+        # ==================== ENVIRONMENT ====================
+        SetEnvironmentVariable('DISPLAY', ':0'),  # Required for GPU access via SSH
+        SetEnvironmentVariable('RCUTILS_COLORIZED_OUTPUT', '1'),
+        SetEnvironmentVariable('RCUTILS_CONSOLE_OUTPUT_FORMAT', '[{severity}] [{name}]: {message}'),
+
+        # ==================== ARGUMENTS ====================
+        DeclareLaunchArgument(
+            'use_sim_time',
+            default_value='false',
+            description='Use simulation time'),
+        
+        DeclareLaunchArgument(
+            'use_rviz',
+            default_value='false',
+            description='Launch RViz for visualization'),
+        
+        DeclareLaunchArgument(
+            'enable_web_viz',
+            default_value='false',
+            description='Enable Flask web visualization (requires ROSBridge)'),
+        
+        DeclareLaunchArgument(
+            'enable_recovery',
+            default_value='true',
+            description='Enable recovery manager for fault tolerance'),
+        
+        DeclareLaunchArgument(
+            'enable_autonomous_navigation',
+            default_value='false',
+            description='SAFETY: Enable autonomous navigation (robot will move to POIs). Set false for testing.'),
+        
+        DeclareLaunchArgument(
+            'detection_model',
+            default_value='YOLO11',
+            description='Detection model: YOLO11, ZED_PERSON_ACCURATE, etc.'),
+        
+        DeclareLaunchArgument(
+            'yolo_model_path',
+            default_value='/home/hype/models/yolo11/yolo11s.onnx',
+            description='Path to YOLO model file'),
+        
+        DeclareLaunchArgument(
+            'confidence_threshold',
+            default_value='50',
+            description='Detection confidence threshold (0-100)'),
+
+        # ==================== INFO MESSAGE ====================
+        LogInfo(
+            msg='\n' + '='*70 + '\n' +
+                '[MANRIIX PHOTOGRAPHY] Complete System Starting\n' +
+                '  ✓ ZED X cameras (3x) - Direct SDK mode\n' +
+                '  ✓ YOLO11 human detection\n' +
+                '  ✓ GPU-accelerated clustering\n' +
+                '  ✓ POI management + Mission planning\n' +
+                '  ✓ Nav2 + SLAM (3D perception enabled)\n' +
+                '  ✓ Photography intelligence\n' +
+                '  ✓ Recovery manager\n' +
+                '\n' +
+                '  ⚠️  AUTONOMOUS NAVIGATION: CHECK PARAMETER\n' +
+                '      enable_autonomous_navigation:=false (SAFE - robot won\'t move)\n' +
+                '      enable_autonomous_navigation:=true  (robot will navigate to POIs)\n' +
+                '\n' +
+                '  NOTE: Terminal 1 must be running robot.launch.py\n' +
+                '        with launch_cameras:=false\n' +
+                '='*70
+        ),
+
+        # ==================== NAV2 + SLAM (3D MODE) ====================
+        # Includes: SLAM Toolbox, Nav2 stack with STVL, Collision Monitor
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(nav_pkg, 'launch', 'slam_nav.launch.py')
+            ),
+            launch_arguments={
+                'use_sim_time': use_sim_time,
+                'use_3d_perception': 'true',  # Always use 3D for photography
+                'use_rviz': use_rviz,
+            }.items()
+        ),
+
+        # ==================== CAMERAS + DETECTION ====================
+        # Direct ZED SDK detection node (multi-camera)
+        # Publishes: /human_clustering/humans, camera images
+        Node(
+            package='manriix_perception',
+            executable='direct_zed_detection_node.py',
+            name='direct_zed_detection_node',
+            output='screen',
+            parameters=[
+                photographer_params,
+                {
+                    'detection_model': detection_model,
+                    'yolo_model_path': yolo_model_path,
+                    'confidence_threshold': confidence_threshold,
+                    'use_sim_time': use_sim_time,
+                }
+            ],
+            respawn=True,
+            respawn_delay=2.0
+        ),
+
+        # ==================== CLUSTERING ====================
+        # GPU-accelerated BIRCH clustering of humans
+        Node(
+            package='manriix_perception',
+            executable='human_clustering_node.py',
+            name='human_clustering_node',
+            output='screen',
+            parameters=[
+                photographer_params,
+                {'use_sim_time': use_sim_time}
+            ],
+            respawn=True,
+            respawn_delay=2.0
+        ),
+
+        # ==================== POI MANAGEMENT ====================
+        # Creates Points of Interest from clusters
+        Node(
+            package='manriix_perception',
+            executable='poi_manager.py',
+            name='poi_manager',
+            output='screen',
+            parameters=[
+                photographer_params,
+                {'use_sim_time': use_sim_time}
+            ],
+            respawn=True,
+            respawn_delay=2.0
+        ),
+
+        # ==================== MISSION CONTROL ====================
+        # State machine for photography missions
+        Node(
+            package='manriix_perception',
+            executable='mission_controller.py',
+            name='mission_controller',
+            output='screen',
+            parameters=[
+                photographer_params,
+                {
+                    'use_sim_time': use_sim_time,
+                    'enable_autonomous_navigation': LaunchConfiguration('enable_autonomous_navigation')
+                }
+            ],
+            respawn=True,
+            respawn_delay=2.0
+        ),
+
+        # ==================== PHOTO INTELLIGENCE ====================
+        # Dynamic photo timing based on crowd analysis
+        Node(
+            package='manriix_perception',
+            executable='photo_intelligence_system.py',
+            name='photo_intelligence_system',
+            output='screen',
+            parameters=[
+                photographer_params,
+                {'use_sim_time': use_sim_time}
+            ],
+            respawn=True,
+            respawn_delay=2.0
+        ),
+
+        # ==================== RECOVERY MANAGER ====================
+        # Fault tolerance and recovery
+        Node(
+            package='manriix_perception',
+            executable='recovery_manager.py',
+            name='recovery_manager',
+            output='screen',
+            parameters=[
+                photographer_params,
+                {'use_sim_time': use_sim_time}
+            ],
+            condition=IfCondition(enable_recovery),
+            respawn=True,
+            respawn_delay=2.0
+        ),
+
+        # ==================== WEB VISUALIZATION (OPTIONAL) ====================
+        # Flask web interface on port 5002
+        # Requires: ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+        Node(
+            package='manriix_perception',
+            executable='remote_viz.py',
+            name='remote_viz',
+            output='screen',
+            parameters=[{'use_sim_time': use_sim_time}],
+            condition=IfCondition(enable_web_viz)
+        ),
+
+        # ==================== COMPLETION MESSAGE ====================
+        LogInfo(
+            msg='\n' + '='*70 + '\n' +
+                '[MANRIIX PHOTOGRAPHY] System Ready!\n' +
+                '\n' +
+                'Photography nodes:\n' +
+                '  • Direct ZED detection: YOLO11 on 3 cameras\n' +
+                '  • Human clustering: GPU BIRCH algorithm\n' +
+                '  • POI manager: Optimal position calculation\n' +
+                '  • Mission controller: State machine active\n' +
+                '  • Photo intelligence: Dynamic timing\n' +
+                '\n' +
+                'Navigation:\n' +
+                '  • SLAM Toolbox: Building map\n' +
+                '  • Nav2: 3D obstacle avoidance\n' +
+                '  • Collision Monitor: Emergency stop\n' +
+                '\n' +
+                'Topics to monitor:\n' +
+                '  ros2 topic echo /human_clustering/humans\n' +
+                '  ros2 topic echo /clusters\n' +
+                '  ros2 topic echo /mission/pois\n' +
+                '  ros2 topic echo /mission/status\n' +
+                '\n' +
+                'Web interface (if enabled):\n' +
+                '  http://localhost:5002\n' +
+                '='*70
+        ),
+    ])

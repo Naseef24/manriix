@@ -1,0 +1,864 @@
+# =============================================================================
+# Manriix2 Nav2 Parameters - WEDDING VENUE Configuration
+# =============================================================================
+# Purpose: Indoor event venue (wedding) with guests, tables, decorations
+# Strategy: Route-following with safety-first costmap clearing
+# Movement: Forward only + in-place rotations. NO reversing, NO U-turns
+# Sensors: RPLidar A2M12 (360° 2D) + 3× ZED X cameras (3D pointclouds)
+# Localization: AMCL + EKF (NOT ZED visual odometry)
+#
+# File: /home/hype/manriix2_ws/src/manriix_navigation/config/nav2/nav2_params_wedding_venue.yaml
+# BTs:  navigate_route_safety.xml, navigate_through_poses_route_safety.xml
+# =============================================================================
+
+# ==================== AMCL ====================
+amcl:
+  ros__parameters:
+    use_sim_time: False
+    alpha1: 0.2
+    alpha2: 0.2
+    alpha3: 0.2
+    alpha4: 0.2
+    alpha5: 0.2
+    base_frame_id: "base_footprint"
+    beam_skip_distance: 0.5
+    beam_skip_error_threshold: 0.9
+    beam_skip_threshold: 0.3
+    do_beams_skip: false
+    global_frame_id: "map"
+    lambda_short: 0.1
+    laser_likelihood_max_dist: 2.0
+    laser_max_range: 100.0
+    laser_min_range: 0.2 #-1.0
+    laser_model_type: "likelihood_field"
+    max_beams: 60
+    max_particles: 2000
+    min_particles: 500
+    odom_frame_id: "odom"
+    pf_err: 0.05
+    pf_z: 0.99
+    recovery_alpha_fast: 0.0
+    recovery_alpha_slow: 0.0
+    resample_interval: 1
+    robot_model_type: "nav2_amcl::OmniMotionModel"
+    save_pose_rate: 0.5
+    sigma_hit: 0.2
+    tf_broadcast: true
+    transform_tolerance: 1.0
+    update_min_a: 0.2
+    update_min_d: 0.25
+    z_hit: 0.5
+    z_max: 0.05
+    z_rand: 0.5
+    z_short: 0.05
+    scan_topic: scan
+    map_topic: map
+    set_initial_pose: false
+    always_reset_initial_pose: false
+    first_map_only: false
+
+# ==================== BT NAVIGATOR ====================
+# NOTE: The waypoint_navigator calls ComputeAndTrackRoute directly (bypasses BT navigator).
+# These BTs are used ONLY for:
+#   - RViz "Nav2 Goal" clicks (NavigateToPose)
+#   - Waypoint navigator in nav_mode=pose (fallback free-space planning)
+# Strategy: safety-first, no free replanning off graph, no spin/backup
+# bt_navigator:
+#   ros__parameters:
+#     use_sim_time: False
+#     global_frame: map
+#     robot_base_frame: base_footprint
+#     odom_topic: /odometry/filtered
+#     bt_loop_duration: 10
+#     default_server_timeout: 20
+#     # Wedding venue BTs - safety-first with selective costmap clearing
+#     default_nav_to_pose_bt_xml: "/home/hype/manriix2_ws/install/manriix_navigation/share/manriix_navigation/behavior_trees/navigate_route_safety.xml"
+#     default_nav_through_poses_bt_xml: "/home/hype/manriix2_ws/install/manriix_navigation/share/manriix_navigation/behavior_trees/navigate_through_poses_route_safety.xml"
+#     navigators: ["navigate_to_pose", "navigate_through_poses"]
+#     navigate_to_pose:
+#       plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
+#     navigate_through_poses:
+#       plugin: "nav2_bt_navigator::NavigateThroughPosesNavigator"
+#     plugin_lib_names:
+#       - nav2_compute_path_to_pose_action_bt_node
+#       - nav2_compute_path_through_poses_action_bt_node
+#       - nav2_smooth_path_action_bt_node
+#       - nav2_follow_path_action_bt_node
+#       - nav2_spin_action_bt_node
+#       - nav2_wait_action_bt_node
+#       - nav2_assisted_teleop_action_bt_node
+#       - nav2_back_up_action_bt_node
+#       - nav2_drive_on_heading_bt_node
+#       - nav2_clear_costmap_service_bt_node
+#       - nav2_is_stuck_condition_bt_node
+#       - nav2_goal_reached_condition_bt_node
+#       - nav2_goal_updated_condition_bt_node
+#       - nav2_globally_updated_goal_condition_bt_node
+#       - nav2_is_path_valid_condition_bt_node
+#       - nav2_initial_pose_received_condition_bt_node
+#       - nav2_reinitialize_global_localization_service_bt_node
+#       - nav2_rate_controller_bt_node
+#       - nav2_distance_controller_bt_node
+#       - nav2_speed_controller_bt_node
+#       - nav2_truncate_path_action_bt_node
+#       - nav2_truncate_path_local_action_bt_node
+#       - nav2_goal_updater_node_bt_node
+#       - nav2_recovery_node_bt_node
+#       - nav2_pipeline_sequence_bt_node
+#       - nav2_round_robin_node_bt_node
+#       - nav2_transform_available_condition_bt_node
+#       - nav2_time_expired_condition_bt_node
+#       - nav2_path_expiring_timer_condition
+#       - nav2_distance_traveled_condition_bt_node
+#       - nav2_single_trigger_bt_node
+#       - nav2_goal_updated_controller_bt_node
+#       - nav2_is_battery_low_condition_bt_node
+#       - nav2_navigate_through_poses_action_bt_node
+#       - nav2_navigate_to_pose_action_bt_node
+#       - nav2_remove_passed_goals_action_bt_node
+#       - nav2_planner_selector_bt_node
+#       - nav2_controller_selector_bt_node
+#       - nav2_goal_checker_selector_bt_node
+#       - nav2_controller_cancel_bt_node
+#       - nav2_path_longer_on_approach_bt_node
+#       - nav2_wait_cancel_bt_node
+#       - nav2_spin_cancel_bt_node
+#       - nav2_back_up_cancel_bt_node
+#       - nav2_assisted_teleop_cancel_bt_node
+#       - nav2_drive_on_heading_cancel_bt_node
+#       - nav2_is_battery_charging_condition_bt_node
+bt_navigator:
+  ros__parameters:
+    use_sim_time: False
+    global_frame: map
+    robot_base_frame: base_footprint
+    odom_topic: /odometry/filtered
+    bt_loop_duration: 10
+    default_server_timeout: 20
+    default_nav_to_pose_bt_xml: "/home/hype/manriix2_ws/install/manriix_navigation/share/manriix_navigation/behavior_trees/navigate_freespace_safety.xml"
+    default_nav_through_poses_bt_xml: "/home/hype/manriix2_ws/install/manriix_navigation/share/manriix_navigation/behavior_trees/navigate_through_poses_route_safety.xml"
+    navigators: ["navigate_to_pose", "navigate_through_poses"]
+    navigate_to_pose:
+      plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
+    navigate_through_poses:
+      plugin: "nav2_bt_navigator::NavigateThroughPosesNavigator"
+    plugin_lib_names:
+      - nav2_compute_path_to_pose_action_bt_node
+      - nav2_compute_path_through_poses_action_bt_node
+      - nav2_smooth_path_action_bt_node
+      - nav2_follow_path_action_bt_node
+      - nav2_spin_action_bt_node
+      - nav2_wait_action_bt_node
+      - nav2_assisted_teleop_action_bt_node
+      - nav2_back_up_action_bt_node
+      - nav2_drive_on_heading_bt_node
+      - nav2_clear_costmap_service_bt_node
+      - nav2_is_stuck_condition_bt_node
+      - nav2_goal_reached_condition_bt_node
+      - nav2_goal_updated_condition_bt_node
+      - nav2_globally_updated_goal_condition_bt_node
+      - nav2_is_path_valid_condition_bt_node
+      - nav2_initial_pose_received_condition_bt_node
+      - nav2_reinitialize_global_localization_service_bt_node
+      - nav2_rate_controller_bt_node
+      - nav2_distance_controller_bt_node
+      - nav2_speed_controller_bt_node
+      - nav2_truncate_path_action_bt_node
+      - nav2_truncate_path_local_action_bt_node
+      - nav2_goal_updater_node_bt_node
+      - nav2_recovery_node_bt_node
+      - nav2_pipeline_sequence_bt_node
+      - nav2_round_robin_node_bt_node
+      - nav2_transform_available_condition_bt_node
+      - nav2_time_expired_condition_bt_node
+      - nav2_path_expiring_timer_condition
+      - nav2_distance_traveled_condition_bt_node
+      - nav2_single_trigger_bt_node
+      - nav2_goal_updated_controller_bt_node
+      - nav2_is_battery_low_condition_bt_node
+      - nav2_navigate_through_poses_action_bt_node
+      - nav2_navigate_to_pose_action_bt_node
+      - nav2_remove_passed_goals_action_bt_node
+      - nav2_planner_selector_bt_node
+      - nav2_controller_selector_bt_node
+      - nav2_goal_checker_selector_bt_node
+      - nav2_controller_cancel_bt_node
+      - nav2_path_longer_on_approach_bt_node
+      - nav2_wait_cancel_bt_node
+      - nav2_spin_cancel_bt_node
+      - nav2_back_up_cancel_bt_node
+      - nav2_assisted_teleop_cancel_bt_node
+      - nav2_drive_on_heading_cancel_bt_node
+      - nav2_is_battery_charging_condition_bt_node
+      - nav2_compute_route_bt_node
+      - nav2_smoother_selector_bt_node
+      
+# ==================== CONTROLLER SERVER (Regulated Pure Pursuit) ====================
+# Tuned for: slow, smooth, predictable movement around wedding guests
+controller_server:
+  ros__parameters:
+    use_sim_time: False
+    controller_frequency: 20.0
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.001
+    min_theta_velocity_threshold: 0.001
+    failure_tolerance: 0.5
+    progress_checker_plugin: "progress_checker"
+    goal_checker_plugins: ["general_goal_checker"]
+    controller_plugins: ["FollowPath"]
+    odom_topic: "/odometry/filtered"
+
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.5
+      movement_time_allowance: 30.0
+
+    general_goal_checker:
+      stateful: True
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.25
+      yaw_goal_tolerance: 0.3
+
+    FollowPath:
+      plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+      desired_linear_vel: 0.3          # was 0.4 - slower for guests
+      lookahead_dist: 0.8 #0.5
+      min_lookahead_dist: 0.5 #0.3
+      max_lookahead_dist: 1.5 #0.8
+      lookahead_time: 1.5
+      rotate_to_heading_angular_vel: 0.3 #0.4  # was 0.6 - gentler rotation
+      transform_tolerance: 0.1
+      use_velocity_scaled_lookahead_dist: true #false
+      min_approach_linear_velocity: 0.05   # was 0.1 - creep slower near waypoints
+      approach_velocity_scaling_dist: 0.8  # was 0.5 - start slowing earlier
+      use_collision_detection: true
+      max_allowed_time_to_collision_up_to_carrot: 1.5
+      use_regulated_linear_velocity_scaling: true
+      use_cost_regulated_linear_velocity_scaling: true   # NEW - slows near high-cost areas
+      regulated_linear_scaling_min_radius: 0.6
+      regulated_linear_scaling_min_speed: 0.05
+      use_rotate_to_heading: true
+      allow_reversing: false
+      rotate_to_heading_min_angle: 0.6 #0.3
+      max_angular_accel: 0.5     # was 0.8 - gentler angular acceleration
+      max_robot_pose_search_dist: 10.0
+      use_interpolation: true    # was false - smoother paths
+
+# ==================== PLANNER SERVER (SmacPlanner2D) ====================
+planner_server:
+  ros__parameters:
+    expected_planner_frequency: 10.0
+    use_sim_time: False
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_smac_planner/SmacPlanner2D"
+      downsample_costmap: false
+      downsampling_factor: 1
+      tolerance: 0.20            # was 0.25 - tighter for precise waypoints
+      allow_unknown: false       # was true - wedding venue is mapped, unknown = obstacle
+      max_iterations: 1000000
+      max_on_approach_iterations: 1000
+      max_planning_time: 3.0     # was 5.0 - faster failure detection
+      cost_travel_multiplier: 3.0  # was 2.0 - stronger obstacle avoidance
+      use_final_approach_orientation: true
+      smooth_path: true          # NEW - smoother paths
+      downsample_obstacle_heuristic: True
+
+# ==================== LOCAL COSTMAP ====================
+# Tuned for: detecting people, dynamic obstacles near robot
+# All 3 ZED X cameras + RPLidar
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      update_frequency: 10.0
+      publish_frequency: 2.0
+      global_frame: odom
+      robot_base_frame: base_footprint
+      use_sim_time: False
+      rolling_window: true
+      width: 4              # was 5 - wedding aisles are narrow
+      height: 4
+      resolution: 0.05
+      transform_tolerance: 0.5
+      initial_transform_timeout: 60.0
+      footprint: "[[0.5, 0.4], [0.5, -0.4], [-0.4, -0.4], [-0.4, 0.4]]"
+      footprint_padding: 0.03
+      plugins: ["voxel_layer", "stvl_layer", "inflation_layer"]
+      filters: ["keepout_filter"]
+
+      # --- Keepout Filter (local costmap) ---
+      keepout_filter:
+        plugin: "nav2_costmap_2d::KeepoutFilter"
+        enabled: True
+        filter_info_topic: "/keepout_costmap_filter_info"
+        transform_tolerance: 0.3
+
+      # --- RPLidar 2D Voxel Layer ---
+      voxel_layer:
+        plugin: "nav2_costmap_2d::VoxelLayer"
+        enabled: True
+        footprint_clearing_enabled: true
+        publish_voxel_map: false
+        origin_z: 0.0
+        z_resolution: 0.1
+        z_voxels: 16
+        max_obstacle_height: 2.0
+        mark_threshold: 0
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          min_obstacle_height: 0.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.15   # match RPLidar A2M12 spec
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+
+      # --- 3D Spatio-Temporal Voxel Layer (3× ZED X cameras) ---
+      stvl_layer:
+        plugin: "spatio_temporal_voxel_layer/SpatioTemporalVoxelLayer"
+        enabled: true
+        voxel_decay: 3.0         # was 5.0 - faster decay for moving people
+        decay_model: 0
+        voxel_size: 0.05
+        track_unknown_space: false  # local costmap: unknown = free (sensors watching)
+        unknown_threshold: 15
+        mark_threshold: 0
+        update_footprint_enabled: true
+        combination_method: 1
+        origin_z: 0.0
+        publish_voxel_map: true
+        transform_tolerance: 0.5
+        mapping_mode: false
+        map_save_duration: 60.0
+
+        observation_sources: front_mark front_clear #left_mark left_clear right_mark right_clear
+
+        # === FRONT CAMERA (primary navigation sensor) ===
+        front_mark:
+          data_type: PointCloud2
+          topic: /zedx_front/zed_node/point_cloud/cloud_registered
+          marking: true
+          clearing: false
+          obstacle_range: 4.0
+          min_obstacle_height: 0.3   # detect kids, low tables
+          max_obstacle_height: 2.0
+          expected_update_rate: 0.0
+          observation_persistence: 0.0
+          inf_is_valid: false
+          filter: "passthrough"
+          voxel_min_points: 0
+          clear_after_reading: true
+
+        front_clear:
+          data_type: PointCloud2
+          topic: /zedx_front/zed_node/point_cloud/cloud_registered
+          marking: false
+          clearing: true
+          min_z: 0.15
+          max_z: 5.0
+          vertical_fov_angle: 1.22
+          horizontal_fov_angle: 1.85
+          decay_acceleration: 5.0
+          model_type: 0
+
+        # === LEFT CAMERA (side safety) ===
+        left_mark:
+          data_type: PointCloud2
+          topic: /zedx_left/zed_node/point_cloud/cloud_registered
+          marking: true
+          clearing: false
+          obstacle_range: 3.0       # shorter range for sides
+          min_obstacle_height: 0.5
+          max_obstacle_height: 2.0
+          expected_update_rate: 0.0
+          observation_persistence: 0.0
+          inf_is_valid: false
+          filter: "passthrough"
+          voxel_min_points: 0
+          clear_after_reading: true
+
+        left_clear:
+          data_type: PointCloud2
+          topic: /zedx_left/zed_node/point_cloud/cloud_registered
+          marking: false
+          clearing: true
+          min_z: 0.15
+          max_z: 4.0
+          vertical_fov_angle: 1.22
+          horizontal_fov_angle: 1.85
+          decay_acceleration: 5.0
+          model_type: 0
+
+        # === RIGHT CAMERA (side safety) ===
+        right_mark:
+          data_type: PointCloud2
+          topic: /zedx_right/zed_node/point_cloud/cloud_registered
+          marking: true
+          clearing: false
+          obstacle_range: 3.0
+          min_obstacle_height: 0.5
+          max_obstacle_height: 2.0
+          expected_update_rate: 0.0
+          observation_persistence: 0.0
+          inf_is_valid: false
+          filter: "passthrough"
+          voxel_min_points: 0
+          clear_after_reading: true
+
+        right_clear:
+          data_type: PointCloud2
+          topic: /zedx_right/zed_node/point_cloud/cloud_registered
+          marking: false
+          clearing: true
+          min_z: 0.15
+          max_z: 4.0
+          vertical_fov_angle: 1.22
+          horizontal_fov_angle: 1.85
+          decay_acceleration: 5.0
+          model_type: 0
+
+      # --- Inflation Layer ---
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 2.0   # was 2.5 - gentler falloff
+        inflation_radius: 0.90     # was 0.80 - wider buffer from guests
+
+      always_send_full_costmap: True
+
+# ==================== GLOBAL COSTMAP ====================
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      global_frame: map
+      robot_base_frame: base_footprint
+      use_sim_time: False
+      width: 30             # was 50 - save CPU for wedding venue
+      height: 30
+      rolling_window: true
+      resolution: 0.05
+      transform_tolerance: 0.5
+      initial_transform_timeout: 60.0
+      track_unknown_space: true
+      footprint: "[[0.5, 0.4], [0.5, -0.4], [-0.4, -0.4], [-0.4, 0.4]]"
+      footprint_padding: 0.03
+      plugins: ["static_layer", "obstacle_layer", "stvl_layer", "inflation_layer"]
+      filters: ["keepout_filter"]
+
+      # --- Keepout Filter (global costmap) ---
+      keepout_filter:
+        plugin: "nav2_costmap_2d::KeepoutFilter"
+        enabled: True
+        filter_info_topic: "/keepout_costmap_filter_info"
+        transform_tolerance: 0.3
+
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        enabled: true
+        map_subscribe_transient_local: True
+
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        footprint_clearing_enabled: true
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          min_obstacle_height: 0.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.15
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+
+      stvl_layer:
+        plugin: "spatio_temporal_voxel_layer/SpatioTemporalVoxelLayer"
+        enabled: true
+        voxel_decay: 15.0       # longer decay for global planning memory
+        decay_model: 0
+        voxel_size: 0.05
+        track_unknown_space: true
+        unknown_threshold: 15
+        mark_threshold: 0
+        update_footprint_enabled: true
+        combination_method: 1
+        origin_z: 0.0
+        publish_voxel_map: false
+        transform_tolerance: 0.5
+        mapping_mode: false
+        map_save_duration: 60.0
+
+        observation_sources: front_mark front_clear #left_mark left_clear right_mark right_clear
+
+        front_mark:
+          data_type: PointCloud2
+          topic: /zedx_front/zed_node/point_cloud/cloud_registered
+          marking: true
+          clearing: false
+          obstacle_range: 4.0
+          min_obstacle_height: 0.25
+          max_obstacle_height: 2.0
+          expected_update_rate: 0.0
+          observation_persistence: 0.0
+          inf_is_valid: false
+          filter: "passthrough"
+          voxel_min_points: 0
+          clear_after_reading: true
+
+        front_clear:
+          data_type: PointCloud2
+          topic: /zedx_front/zed_node/point_cloud/cloud_registered
+          marking: false
+          clearing: true
+          min_z: 0.2
+          max_z: 5.0
+          vertical_fov_angle: 1.22
+          horizontal_fov_angle: 1.85
+          decay_acceleration: 5.0
+          model_type: 0
+
+        left_mark:
+          data_type: PointCloud2
+          topic: /zedx_left/zed_node/point_cloud/cloud_registered
+          marking: true
+          clearing: false
+          obstacle_range: 3.0
+          min_obstacle_height: 0.25
+          max_obstacle_height: 2.0
+          expected_update_rate: 0.0
+          observation_persistence: 0.0
+          inf_is_valid: false
+          filter: "passthrough"
+          voxel_min_points: 0
+          clear_after_reading: true
+
+        left_clear:
+          data_type: PointCloud2
+          topic: /zedx_left/zed_node/point_cloud/cloud_registered
+          marking: false
+          clearing: true
+          min_z: 0.2
+          max_z: 4.0
+          vertical_fov_angle: 1.22
+          horizontal_fov_angle: 1.85
+          decay_acceleration: 5.0
+          model_type: 0
+
+        right_mark:
+          data_type: PointCloud2
+          topic: /zedx_right/zed_node/point_cloud/cloud_registered
+          marking: true
+          clearing: false
+          obstacle_range: 3.0
+          min_obstacle_height: 0.25
+          max_obstacle_height: 2.0
+          expected_update_rate: 0.0
+          observation_persistence: 0.0
+          inf_is_valid: false
+          filter: "passthrough"
+          voxel_min_points: 0
+          clear_after_reading: true
+
+        right_clear:
+          data_type: PointCloud2
+          topic: /zedx_right/zed_node/point_cloud/cloud_registered
+          marking: false
+          clearing: true
+          min_z: 0.2
+          max_z: 4.0
+          vertical_fov_angle: 1.22
+          horizontal_fov_angle: 1.85
+          decay_acceleration: 5.0
+          model_type: 0
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 2.0
+        inflation_radius: 0.90
+
+      always_send_full_costmap: True
+
+# ==================== SMOOTHER SERVER ====================
+# Used by Route BT to smooth graph-computed paths for better controller tracking
+smoother_server:
+  ros__parameters:
+    use_sim_time: False
+    smoother_plugins: ["simple_smoother"]
+    simple_smoother:
+      plugin: "nav2_smoother::SimpleSmoother"
+      tolerance: 1.0e-10
+      max_its: 200 #1000
+      do_refinement: True
+
+# ==================== BEHAVIOR SERVER ====================
+# Only 'wait' registered. Costmap clearing via BT service nodes.
+# No spin/backup (forward + in-place rotation only)
+behavior_server:
+  ros__parameters:
+    costmap_topic: local_costmap/costmap_raw
+    footprint_topic: local_costmap/published_footprint
+    cycle_frequency: 10.0
+    behavior_plugins: ["wait"]
+    wait:
+      plugin: "nav2_behaviors/Wait"
+    global_frame: map
+    robot_base_frame: base_footprint
+    transform_tolerance: 0.3
+    use_sim_time: false
+    simulate_ahead_time: 2.0
+    max_rotational_vel: 0.8
+    min_rotational_vel: 0.2
+    rotational_acc_lim: 0.8
+
+# ==================== COLLISION MONITOR ====================
+# Last line of defense - full surround protection for wedding guests
+# Includes rear protection for in-place rotation safety
+collision_monitor:
+  ros__parameters:
+    use_sim_time: False
+    base_frame_id: "base_footprint"
+    odom_frame_id: "odom"
+    cmd_vel_in_topic: "cmd_vel_smoothed"
+    cmd_vel_out_topic: "cmd_vel"
+    state_topic: "collision_monitor_state"
+    transform_tolerance: 0.3
+    source_timeout: 2.0        # was 5.0 - stop faster if sensor dies
+    base_shift_correction: True
+    stop_pub_timeout: 2.0
+    polygons: ["PolygonStop", "PolygonSlow", "FootprintApproach"]
+
+    # EMERGENCY STOP - full surround including rear
+    # Front: 0.6m, Sides: 0.5m, Rear: 0.5m (~10-15cm clearance)
+    PolygonStop:
+      type: "polygon"
+      points: [0.60, 0.50, 0.60, -0.50, -0.50, -0.50, -0.50, 0.50]
+      action_type: "stop"
+      min_points: 2            # was 4 - catch thin obstacles (child's leg)
+      visualize: True
+      polygon_pub_topic: "polygon_stop"
+      enabled: True
+
+    # SLOWDOWN - wider surround zone, 30% speed
+    # Front: 1.0m, Sides: 0.7m, Rear: 0.6m
+    PolygonSlow:
+      type: "polygon"
+      points: [1.0, 0.70, 1.0, -0.70, -0.60, -0.70, -0.60, 0.70]
+      action_type: "slowdown"
+      min_points: 2
+      slowdown_ratio: 0.3
+      visualize: True
+      polygon_pub_topic: "polygon_slowdown"
+      enabled: True
+
+    # PREDICTIVE APPROACH - simulates trajectory for collision prediction
+    FootprintApproach:
+      type: "polygon"
+      action_type: "approach"
+      footprint_topic: "/local_costmap/published_footprint"
+      time_before_collision: 2.0    # was 1.2 - earlier braking
+      simulation_time_step: 0.05    # was 0.1 - finer prediction
+      min_points: 2
+      visualize: False
+      enabled: True
+
+    # Sensor sources - RPLidar + all 3 ZED X cameras
+    # observation_sources: ["scan", "pointcloud_front", "pointcloud_left", "pointcloud_right"]
+    observation_sources: ["scan", "pointcloud_front"]
+
+    scan:
+      type: "scan"
+      topic: "/scan"
+      min_height: 0.05          # detect floor cables
+      max_height: 2.0
+      enabled: True
+
+    pointcloud_front:
+      type: "pointcloud"
+      topic: "/zedx_front/zed_node/point_cloud/cloud_registered"
+      min_height: 0.10
+      max_height: 2.0
+      enabled: True
+
+    pointcloud_left:
+      type: "pointcloud"
+      topic: "/zedx_left/zed_node/point_cloud/cloud_registered"
+      min_height: 0.10
+      max_height: 2.0
+      enabled: True
+
+    pointcloud_right:
+      type: "pointcloud"
+      topic: "/zedx_right/zed_node/point_cloud/cloud_registered"
+      min_height: 0.10
+      max_height: 2.0
+      enabled: True
+
+# ==================== VELOCITY SMOOTHER ====================
+# Gentle, wedding-appropriate motion - NO reversing
+velocity_smoother:
+  ros__parameters:
+    use_sim_time: False
+    smoothing_frequency: 20.0
+    scale_velocities: False
+    feedback: "OPEN_LOOP"
+    max_velocity: [0.3, 0.0, 0.6]     # was [0.8, 0.0, 1.0]
+    min_velocity: [0.0, 0.0, -0.6]    # was [-0.3, ...] - NO REVERSE
+    max_accel: [0.3, 0.0, 0.5]        # was [0.5, 0.0, 0.8] - gentler
+    max_decel: [-0.5, 0.0, -0.8]
+    odom_topic: "odometry/filtered"
+    odom_duration: 0.1
+    deadband_velocity: [0.01, 0.0, 0.01]
+    velocity_timeout: 1.0
+
+# ==================== MAP SERVER ====================
+map_server:
+  ros__parameters:
+    use_sim_time: False
+    yaml_filename: ""
+
+map_saver:
+  ros__parameters:
+    use_sim_time: False
+    save_map_timeout: 5.0
+    free_thresh_default: 0.25
+    occupied_thresh_default: 0.65
+    map_subscribe_transient_local: True
+
+# =============================================================================
+# ROUTE SERVER (Nav2 Route Server)
+# =============================================================================
+# Architecture 1: Route → dense path → Controller (strict route following)
+# The route server computes optimal routes through a pre-defined navigation
+# graph (.geojson), outputs dense nav_msgs/Path for the controller to track.
+# ComputeAndTrackRoute also monitors route progress and triggers operations.
+#
+# For wedding venue: robot MUST follow pre-planned routes (graph edges).
+# If an edge is blocked (guest standing in path), the CollisionMonitor
+# operation detects it and triggers rerouting around the blocked edge.
+# =============================================================================
+route_server:
+  ros__parameters:
+    use_sim_time: False
+    base_frame: "base_footprint"
+    route_frame: "map"
+
+    # --- Path Generation ---
+    path_density: 0.05              # Dense path point spacing (m) - match costmap resolution
+    max_iterations: 0               # 0 = unlimited search iterations
+    max_planning_time: 2.0          # Max planning time (seconds)
+
+    # --- Corner Smoothing ---
+    # Smooth transitions between edges for smoother controller tracking
+    smooth_corners: true
+    smoothing_radius: 0.8           # Radius of corner arc (m) - match robot turning radius
+
+    # --- Costmap for nearest-neighbor search ---
+    costmap_topic: 'global_costmap/costmap_raw'
+
+    # --- Graph File Loader ---
+    graph_file_loader: "GeoJsonGraphFileLoader"
+    GeoJsonGraphFileLoader:
+      plugin: "nav2_route::GeoJsonGraphFileLoader"
+    # graph_filepath set via launch file argument
+
+    # --- Edge Cost Functions ---
+    # DistanceScorer: minimize total route distance, respects speed_limit metadata
+    # CostmapScorer: avoid edges that cross high-cost areas (obstacles in costmap)
+    # DynamicEdgesScorer: allow blocking/unblocking edges at runtime via service
+    edge_cost_functions: ["DistanceScorer", "CostmapScorer", "DynamicEdgesScorer"]
+
+    DistanceScorer:
+      plugin: "nav2_route::DistanceScorer"
+      weight: 1.0
+      speed_tag: "speed_limit"      # Graph metadata key for % speed limits
+
+    CostmapScorer:
+      plugin: "nav2_route::CostmapScorer"
+      weight: 2.0                   # Strongly prefer edges away from obstacles
+      costmap_topic: "global_costmap/costmap_raw"
+      max_cost: 253.0               # Cost threshold = blocked
+      use_maximum: true             # Use max cost on edge (conservative)
+      invalid_on_collision: true    # Mark edge invalid if in collision
+      invalid_off_map: true         # Mark edge invalid if off map
+
+    DynamicEdgesScorer:
+      plugin: "nav2_route::DynamicEdgesScorer"
+
+    # --- Route Operations ---
+    # AdjustSpeedLimit: publishes speed limits from graph metadata per-edge
+    # CollisionMonitor: forward-looking collision check → reroute if blocked
+    # ReroutingService: allows external service call to trigger reroute
+    operations: ["AdjustSpeedLimit", "CollisionMonitor", "ReroutingService"]
+
+    AdjustSpeedLimit:
+      plugin: "nav2_route::AdjustSpeedLimit"
+      speed_limit_topic: "speed_limit"
+      speed_tag: "speed_limit"
+
+    CollisionMonitor:
+      plugin: "nav2_route::CollisionMonitor"
+      costmap_topic: "global_costmap/costmap_raw"
+      rate: 2.0                     # Check at 2Hz (wedding = slow movement)
+      max_cost: 253.0
+      max_collision_dist: 3.0       # Look 3m ahead on route (enough for 0.3m/s)
+      check_resolution: 1
+      reroute_on_collision: true    # Reroute around blocked edge, don't fail
+
+    ReroutingService:
+      plugin: "nav2_route::ReroutingService"
+
+    # --- Route Tracking ---
+    tracker_update_rate: 20.0       # Match controller frequency (no need for 50Hz)
+    aggregate_blocked_ids: true     # Remember all blocked edges during this request
+
+    # --- Node Achievement ---
+    # Generous radii because RPP controller may deviate slightly from path
+    boundary_radius_to_achieve_node: 0.8   # Start/end node radius (m)
+    radius_to_achieve_node: 1.2            # Intermediate node radius (m)
+
+    # --- Pruning ---
+    max_prune_dist_from_edge: 4.0   # Max dist to consider edge in-progress
+    min_prune_dist_from_goal: 0.15
+    min_prune_dist_from_start: 0.10
+    prune_goal: true
+
+    # --- Nearest-Neighbor Search ---
+    enable_nn_search: true          # Use BFS in costmap for better start/goal matching
+    max_nn_search_iterations: 10000
+    num_nearest_nodes: 5
+
+# =============================================================================
+# KEEPOUT FILTER (Costmap Filter for restricted zones)
+# =============================================================================
+# Marks wedding venue restricted areas (e.g. stage, gift table, dance floor
+# during ceremony) as lethal in both global and local costmaps.
+# Requires:
+#   1. A keepout mask .yaml/.pgm (same format as map, with restricted areas)
+#   2. keepout_filter_mask_server (map_server instance publishing mask)
+#   3. keepout_costmap_filter_info_server (publishing CostmapFilterInfo)
+# =============================================================================
+
+# Map Server instance for keepout filter mask
+keepout_filter_mask_server:
+  ros__parameters:
+    use_sim_time: False
+    topic_name: "/keepout_filter_mask"
+    # yaml_filename set via launch file argument (keepout mask yaml)
+
+# Costmap Filter Info Server for keepout zones
+keepout_costmap_filter_info_server:
+  ros__parameters:
+    use_sim_time: False
+    type: 0                         # 0 = Keepout Filter
+    filter_info_topic: "/keepout_costmap_filter_info"
+    mask_topic: "/keepout_filter_mask"
+    base: 0.0
+    multiplier: 1.0

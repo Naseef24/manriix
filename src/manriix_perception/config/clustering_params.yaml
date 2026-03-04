@@ -1,0 +1,194 @@
+# ROS2-Compatible Parameter File for Human Clustering Node
+# This file contains ONLY the ros__parameters section for ROS2's parameter system
+# Complex configs are still loaded from clustering_config.yaml programmatically
+
+human_clustering_node:
+  ros__parameters:
+    # Camera Configuration (Canon R6)
+    camera:
+      model: "Canon R6"
+      sensor:
+        width: 36.0   # mm
+        height: 24.0  # mm
+      lens:
+        type: "RF 24-105mm"
+        focal_length: 24.0  # mm (fixed at widest)
+      fov:
+        horizontal: 73.7  # degrees
+        vertical: 53.4   # degrees
+      working_distance:
+        min: 2.0   # meters
+        max: 6.0   # meters
+
+    # ZED X Camera Specifications
+    camera_specs:
+      depth_fov:
+        horizontal: 120.0   # degrees (ZED X wide FOV)
+        vertical: 90.0      # degrees
+      rgb_fov:
+        horizontal: 120.0   # degrees
+        vertical: 90.0      # degrees
+      effective_range:
+        min: 0.3           # meters
+        max: 8.0           # meters
+      optimal_scanning_overlap: 30.0  # degrees overlap between cameras
+
+    # Transform Parameters
+    transform:
+      camera_frame: "zedx_front_left_camera_frame"  # ZED camera frame
+      base_frame: "base_footprint"         # Robot base frame (Nav2 standard, at ground level)
+      map_frame: "map"                      # World coordinate frame
+      tf_timeout: 0.5                       # seconds
+      map_origin: [0.0, 0.0, 0.0]          # [x, y, z] in meters
+
+    # Local Visualization Parameters (matplotlib only, web interface uses /web/* topics)
+    visualization:
+      enabled: false         # Toggle local matplotlib visualization - DISABLED for headless Jetson
+
+      # Matplotlib settings
+      matplotlib:
+        max_range: 8.0        # Maximum range to display (meters)
+        update_rate: 10.0     # Hz
+
+      # Colors
+      colors:
+        human: '#4ECDC4'      # Cyan for humans
+        robot: '#66CC66'      # Green for robot
+        robot_heading: '#88CC88'  # Light green for heading
+        cluster: '#45B7D1'    # Light blue for clusters
+        optimal: '#FFD93D'    # Yellow for optimal positions
+        axes: '#FFFFFF'       # White for axes
+        background: '#282C34' # Dark background
+        fov: '#66CC66'       # Green for camera FOV
+        free: '#3E4451'      # Dark gray for free space
+        occupied: '#FF6B6B'  # Red for occupied space
+
+    # Debug Parameters
+    debug:
+      print_transforms: false     # Print transform information
+      print_positions: false      # Print human positions
+      print_clusters: false
+
+    # Map and Obstacle Parameters
+    map:
+      free_threshold: 20       # Values below this are considered free space
+      occupied_threshold: 80   # Values above this are considered occupied
+      unknown_cell_strategy: "cautious"  # Options: "cautious", "exploratory", "adaptive"
+      
+    obstacle:
+      min_safety_margin: 2     # cells
+      max_safety_margin: 5     # cells
+      density_radius: 10       # cells
+      complexity_calculation: "entropy"  # Options: "entropy", "variance", "gradient"
+      
+    position:
+      reachability_check: true
+      obstacle_proximity_weight: 0.20
+      environment_complexity_weight: 0.15
+      temporal_consistency_weight: 0.10
+      history_length: 10  # Number of past positions to track
+      formation_scores:
+        line: 1.0
+        formal_pose: 0.95
+        circle: 0.9
+        pair: 0.85
+        single_person: 0.8
+        small_group: 0.8
+        large_group: 0.7
+        scattered: 0.6
+        unknown: 0.5
+      weights:
+        distance: 0.20
+        size: 0.10
+        density: 0.10
+        formation: 0.10
+        stability: 0.10
+        composition: 0.15
+        obstacle_proximity: 0.15
+        environment_complexity: 0.10
+        path_feasibility: 0.10
+        temporal_consistency: 0.05
+
+    # Movement Parameters
+    movement:
+      distance_threshold: 0.4
+      orientation_threshold: 15
+      position_stable_duration: 1.0
+
+    # Target Detection Parameters
+    target_detection:
+      scan_region_radius: 1.0                    # Distance tolerance to consider target "reached" (meters)
+      position_change_threshold: 0.05           # Movement threshold to detect if robot stopped (meters)
+      position_stable_duration: 0.5             # Time robot must be stationary before scanning starts (seconds)
+      check_orientation: false                  # Whether to check robot orientation alignment
+      orientation_tolerance_degrees: 15.0       # Orientation tolerance when check_orientation is true (degrees)
+      scan_duration: 120.0                       # Duration to scan at each position (seconds)
+      enable_position_stability_check: false
+
+    # Recovery and Exploration Parameters
+    recovery:
+      orientation_scan_angles: 6          # Number of orientations for 360° coverage (60° each)
+      orientation_wait_time: 1.0          # Seconds to wait at each orientation
+      max_recovery_attempts: 3            # Full rotation attempts before fallback
+      fallback_distance_threshold: 1.5    # Minimum distance for fallback positions (meters)
+      no_data_timeout: 60.0              # Max seconds without human data before recovery
+      enable_orientation_recovery: true   # Enable/disable orientation scanning
+      enable_fallback_positioning: true  # Enable/disable fallback to previous positions
+
+    # BIRCH Clustering Parameters
+    birch:
+      enabled: true                      # Use BIRCH instead of DBSCAN
+      threshold: 1.5                     # Distance threshold for clustering
+      branching_factor: 50               # CF-tree branching factor
+      n_clusters: null                   # Auto-determine number of clusters
+      adaptive_threshold: true           # Enable dynamic threshold adjustment
+      min_threshold: 1.0                 # Minimum threshold for dense crowds
+      max_threshold: 2.0                 # Maximum threshold for sparse crowds
+      micro_batch_size: 3                # Process frames in micro-batches
+      window_size: 150                   # Sliding window size (5s at 30 FPS)
+
+    # GPU Acceleration Parameters
+    gpu:
+      enabled: false                     # Enable GPU acceleration
+      device_id: 0                       # CUDA device ID
+      memory_limit: 4096                 # Maximum GPU memory usage (MB)
+      use_unified_memory: false           # Use unified memory on Jetson
+
+    # Kalman Tracking Parameters
+    tracking:
+      use_kalman: true                    # Enable Kalman filtering for tracking
+      max_tracks: 100                     # Maximum number of simultaneous tracks
+      max_age: 10                         # Delete track after N frames without update
+      min_hits: 3                         # Minimum hits to confirm track
+      min_confidence: 0.3                 # Minimum confidence to maintain track
+      prediction_horizon: 1.0             # Predict N seconds ahead
+      hungarian_max_distance: 2.0         # Maximum distance for Hungarian assignment
+
+    # JIT Compilation Parameters (DISABLED)
+    jit:
+      enabled: false                      # Enable JIT compilation
+      use_numba: false                    # Use Numba JIT
+      use_cuda_jit: false                 # Use CUDA JIT kernels
+      cache_compiled: false               # Cache compiled functions
+
+    # Frame Processing Parameters
+    frame_processing:
+      enable_skipping: true              # Enable frame skipping
+      max_skip_frames: 3                 # Maximum consecutive frames to skip
+      enable_interpolation: true         # Enable position interpolation
+      adaptive_processing: true          # Adapt to scene complexity
+
+    # Quality Control Parameters
+    quality_control:
+      auto_adjust: true                  # Automatic quality adjustment
+      target_fps: 30.0                   # Target frame rate
+      min_fps: 15.0                      # Minimum acceptable FPS
+      hysteresis: 0.1                    # Prevent oscillation
+
+    # Performance Monitoring
+    monitoring:
+      enabled: true                      # Enable performance monitoring
+      publish_rate: 1.0                  # Monitoring publish rate (Hz)
+      history_size: 100                  # Performance history buffer size
+      enable_jetson_monitoring: true     # Jetson-specific monitoring
+      enable_profiling: false            # Detailed profiling (debug)

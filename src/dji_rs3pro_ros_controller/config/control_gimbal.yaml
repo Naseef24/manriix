@@ -1,0 +1,11 @@
+/**:
+  ros__parameters:
+    print_status: true
+    roll_max: 45.0
+    roll_min: -45.0
+    pitch_max: 45.0
+    pitch_min: -45.0
+    yaw_max: 180.0
+    yaw_min: -180.0
+    angular_velocity_threshold: 4.0
+    target_angle_threshold: 2.5

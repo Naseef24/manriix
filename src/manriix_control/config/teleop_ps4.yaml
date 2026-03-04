@@ -1,0 +1,24 @@
+# Teleop configuration for PS4 joystick
+joy_teleop:
+  ros__parameters:
+    axis_linear:
+      x: 1  # Left stick vertical
+    scale_linear:
+      x: 0.5  # Max 0.5 m/s (matches your controller max)
+    scale_linear_turbo:
+      x: 1.0  # Turbo mode (not recommended for Ackermann)
+    
+    axis_angular:
+      yaw: 3  # Right stick horizontal
+    scale_angular:
+      yaw: 0.5  # Max 0.5 rad/s (matches your controller max)
+    
+    enable_button: 4   # L1 button (index 4)
+    enable_turbo_button: 5  # R1 button (index 5)
+
+joy_node:
+  ros__parameters:
+    device_id: 0
+    deadzone: 0.1
+    autorepeat_rate: 20.0
+    coalesce_interval_ms: 1

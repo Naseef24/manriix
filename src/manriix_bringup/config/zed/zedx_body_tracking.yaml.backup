@@ -1,0 +1,79 @@
+# ZED X Body Tracking Configuration
+# Applied to all 3 cameras for human detection
+
+/**:
+    ros__parameters:
+        # General settings
+        general:
+            grab_resolution: 'HD1200'
+            grab_frame_rate: 15
+            
+        # Depth settings
+        depth:
+            depth_mode: 'NEURAL'
+            min_depth: 0.3
+            max_depth: 15.0
+            depth_stabilization: 1
+            
+        # Positional tracking (needed for body tracking)
+        pos_tracking:
+            pos_tracking_enabled: true
+            imu_fusion: true
+            
+        # Body Tracking - KEY FOR YOUR PROJECT
+        body_tracking:
+            bt_enabled: false #true
+            bt_model: 'HUMAN_BODY_MEDIUM'
+            bt_format: 'BODY_38'
+            bt_allow_reduced_precision_inference: true
+            bt_max_range: 10.0
+            bt_body_fitting: true
+            bt_enable_tracking: true
+            bt_enable_segmentation: false
+            bt_detection_confidence_threshold: 50
+            bt_minimum_keypoints_threshold: 8
+            
+        # # Disable object detection (using body tracking instead)
+        # object_detection:
+        #     od_enabled: false
+
+        # Object Detection - OPTIONAL for bounding box visualization
+        object_detection:
+            od_enabled: true
+            detection_model: 'MULTI_CLASS_BOX_FAST'
+            allow_reduced_precision_inference: true
+            max_range: 8.0
+            enable_tracking: true
+            filtering_mode: 'NMS3D'
+            prediction_timeout: 0.5
+            class:
+                people:
+                    enabled: true
+                    confidence_threshold: 50.0
+                vehicle:
+                    enabled: true
+                    confidence_threshold: 50.0
+                animal:
+                    enabled: true
+                    confidence_threshold: 40.0
+                bag:
+                    enabled: false
+                    confidence_threshold: 40.0
+                electronics:
+                    enabled: false
+                    confidence_threshold: 40.0
+                fruit_vegetable:
+                    enabled: false
+                    confidence_threshold: 40.0
+                sport:
+                    enabled: false
+                    confidence_threshold: 40.0
+
+
+        # Point cloud for obstacle avoidance
+        mapping:
+            mapping_enabled: false
+            
+        # Sensors
+        sensors:
+            sensors_image_sync: true

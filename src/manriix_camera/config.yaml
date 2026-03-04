@@ -1,0 +1,29 @@
+# Camera Control System Configuration
+
+logging:
+  log_dir: logs
+  retention_days: 60
+
+storage:
+  save_folder: ~/camera_data
+  required_space_mb: 50
+
+video_recording:
+  duration: 10  # seconds
+
+streaming:
+  jpeg_quality: 70
+  local:
+    frame_width: 1280
+    frame_height: 720
+    framerate: 30
+    port: 8080
+  internet:
+    frame_width: 1280
+    frame_height: 720
+    framerate: 15
+    port: 5000
+
+camera:
+  auto_focus: true
+  capture_timeout: 5

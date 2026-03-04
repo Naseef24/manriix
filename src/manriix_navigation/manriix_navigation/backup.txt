@@ -1,0 +1,757 @@
+#!/usr/bin/env python3
+"""
+Waypoint Navigator Node with Route Server Support
+
+Supports two navigation modes:
+- route: Uses ComputeRoute + FollowPath (graph-based, Nav2 Architecture 1)
+- pose:  Uses NavigateToPose action (free-space planning, original behavior)
+
+Waypoints can be specified as:
+- Poses:    [{"x": 1.0, "y": 2.0, "theta": 0.0, "name": "WP1"}]
+- Node IDs: [{"node_id": 0}, {"node_id": 5}, {"node_id": 9}]
+  (node IDs reference graph nodes - route mode only)
+
+Wait modes at each waypoint:
+- photo_command: Wait for /photo/command "stop" signal
+- time_based:   Wait fixed duration, publishes yes/no to /photo/command
+"""
+
+import rclpy
+from rclpy.node import Node
+from rclpy.action import ActionClient
+from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
+from rclpy.callback_groups import ReentrantCallbackGroup
+
+from geometry_msgs.msg import PoseStamped, PointStamped
+from std_msgs.msg import String, Int32, Float32
+from nav2_msgs.action import NavigateToPose, ComputeRoute, FollowPath
+
+import json
+import math
+import time
+import threading
+from enum import Enum
+from typing import List, Optional
+from dataclasses import dataclass, field
+
+
+class WaypointState(Enum):
+    IDLE = "idle"
+    NAVIGATING = "navigating"
+    WAITING = "waiting"
+    PAUSED = "paused"
+    STOPPED = "stopped"
+    COMPLETED = "completed"
+
+
+class WaitMode(Enum):
+    PHOTO_COMMAND = "photo_command"
+    TIME_BASED = "time_based"
+
+
+class NavMode(Enum):
+    ROUTE = "route"
+    POSE = "pose"
+
+
+@dataclass
+class Waypoint:
+    x: float = 0.0
+    y: float = 0.0
+    theta: float = 0.0
+    name: str = ""
+    node_id: Optional[int] = None  # Graph node ID (for route mode)
+
+
+class WaypointNavigator(Node):
+    def __init__(self):
+        super().__init__('waypoint_navigator')
+
+        self.get_logger().info("=" * 60)
+        self.get_logger().info("Starting Waypoint Navigator Node (Route + Pose)")
+        self.get_logger().info("=" * 60)
+
+        # Declare parameters
+        self.declare_parameter('wait_mode', 'time_based')
+        self.declare_parameter('wait_time', 300.0)
+        self.declare_parameter('loop_continuous', True)
+        self.declare_parameter('nav_mode', 'route')
+        self.declare_parameter('route_graph', '')
+
+        # Get parameters
+        self.wait_mode = WaitMode(self.get_parameter('wait_mode').value)
+        self.wait_time = self.get_parameter('wait_time').value
+        self.loop_continuous = self.get_parameter('loop_continuous').value
+        self.nav_mode = NavMode(self.get_parameter('nav_mode').value)
+        self.route_graph = self.get_parameter('route_graph').value
+
+        # State
+        self.state = WaypointState.IDLE
+        self.waypoints: List[Waypoint] = []
+        self.current_waypoint_index = 0
+        self.loop_count = 0
+        self.photo_stop_received = False
+        self.navigation_goal_handle = None
+
+        # Route navigation state
+        self.follow_path_goal_handle = None
+
+        # Thread safety
+        self.state_lock = threading.Lock()
+        self.cb_group = ReentrantCallbackGroup()
+
+        # QoS profiles
+        reliable_qos = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.VOLATILE,
+            depth=10
+        )
+
+        # Publishers
+        self.status_pub = self.create_publisher(String, '/waypoint/status', reliable_qos)
+        self.current_wp_pub = self.create_publisher(Int32, '/waypoint/current', reliable_qos)
+        self.progress_pub = self.create_publisher(Float32, '/waypoint/progress', reliable_qos)
+        self.photo_command_pub = self.create_publisher(String, '/photo/command', reliable_qos)
+
+        # Subscribers
+        self.waypoint_list_sub = self.create_subscription(
+            String, '/waypoint/list', self.waypoint_list_callback, reliable_qos,
+            callback_group=self.cb_group
+        )
+        self.control_sub = self.create_subscription(
+            String, '/waypoint/control', self.control_callback, reliable_qos,
+            callback_group=self.cb_group
+        )
+        self.config_sub = self.create_subscription(
+            String, '/waypoint/config', self.config_callback, reliable_qos,
+            callback_group=self.cb_group
+        )
+        self.photo_command_sub = self.create_subscription(
+            String, '/photo/command', self.photo_command_callback, reliable_qos,
+            callback_group=self.cb_group
+        )
+
+        # RViz clicked point subscriber (add waypoints by clicking)
+        self.clicked_point_sub = self.create_subscription(
+            PointStamped, "/clicked_point", self.clicked_point_callback, 10,
+            callback_group=self.cb_group
+        )
+
+        # Action Clients
+        self.nav_client = ActionClient(
+            self, NavigateToPose, 'navigate_to_pose',
+            callback_group=self.cb_group
+        )
+        self.route_client = ActionClient(
+            self, ComputeRoute, 'compute_route',
+            callback_group=self.cb_group
+        )
+        self.follow_path_client = ActionClient(
+            self, FollowPath, 'follow_path',
+            callback_group=self.cb_group
+        )
+
+        # Status timer
+        self.status_timer = self.create_timer(1.0, self.publish_status)
+
+        self.get_logger().info(f"Navigation mode: {self.nav_mode.value}")
+        self.get_logger().info(f"Wait mode: {self.wait_mode.value}")
+        self.get_logger().info(f"Wait time: {self.wait_time}s")
+        self.get_logger().info(f"Loop continuous: {self.loop_continuous}")
+        if self.route_graph:
+            self.get_logger().info(f"Route graph: {self.route_graph}")
+        self.get_logger().info("Waypoint Navigator ready - waiting for waypoints")
+
+    # ==================== PUBLISHERS ====================
+
+    def publish_photo_command(self, command: str):
+        """Publish command to /photo/command topic"""
+        msg = String()
+        msg.data = command
+        self.photo_command_pub.publish(msg)
+        self.get_logger().info(f"Published '{command}' to /photo/command")
+
+    # ==================== CALLBACKS ====================
+
+    def clicked_point_callback(self, msg: PointStamped):
+        """Add waypoint from RViz clicked point"""
+        wp = Waypoint(
+            x=msg.point.x,
+            y=msg.point.y,
+            theta=0.0,
+            name=f"WP{len(self.waypoints) + 1}"
+        )
+        self.waypoints.append(wp)
+        self.get_logger().info(
+            f"Added waypoint from RViz click: ({wp.x:.2f}, {wp.y:.2f})")
+        self.get_logger().info(f"Total waypoints: {len(self.waypoints)}")
+
+    def waypoint_list_callback(self, msg: String):
+        """
+        Receive waypoint list as JSON.
+
+        Supports two formats:
+        1. Pose-based: [{"x": 1.0, "y": 2.0, "theta": 0.0, "name": "WP1"}]
+        2. Node ID-based: [{"node_id": 0, "name": "Start"}, {"node_id": 5}]
+        3. Mixed: [{"node_id": 0}, {"x": 3.0, "y": 5.0}]
+        """
+        try:
+            data = json.loads(msg.data)
+            self.waypoints = []
+            for wp_data in data:
+                wp = Waypoint(
+                    x=float(wp_data.get('x', 0.0)),
+                    y=float(wp_data.get('y', 0.0)),
+                    theta=float(wp_data.get('theta', 0.0)),
+                    name=wp_data.get('name', f"WP{len(self.waypoints) + 1}"),
+                    node_id=wp_data.get('node_id', None),
+                )
+                # Convert node_id to int if present
+                if wp.node_id is not None:
+                    wp.node_id = int(wp.node_id)
+                self.waypoints.append(wp)
+
+            self.get_logger().info(f"Received {len(self.waypoints)} waypoints")
+            for i, wp in enumerate(self.waypoints):
+                if wp.node_id is not None:
+                    self.get_logger().info(
+                        f"  WP{i + 1}: node_id={wp.node_id} ({wp.name})")
+                else:
+                    self.get_logger().info(
+                        f"  WP{i + 1}: ({wp.x:.2f}, {wp.y:.2f}, θ={wp.theta:.2f}) ({wp.name})")
+
+        except Exception as e:
+            self.get_logger().error(f"Error parsing waypoint list: {e}")
+
+    def config_callback(self, msg: String):
+        """Receive configuration as JSON"""
+        try:
+            config = json.loads(msg.data)
+
+            if 'wait_mode' in config:
+                self.wait_mode = WaitMode(config['wait_mode'])
+                self.get_logger().info(f"Wait mode set to: {self.wait_mode.value}")
+
+            if 'wait_time' in config:
+                self.wait_time = float(config['wait_time'])
+                self.get_logger().info(f"Wait time set to: {self.wait_time}s")
+
+            if 'loop_continuous' in config:
+                self.loop_continuous = bool(config['loop_continuous'])
+                self.get_logger().info(f"Loop continuous: {self.loop_continuous}")
+
+            if 'nav_mode' in config:
+                new_mode = NavMode(config['nav_mode'])
+                if self.state == WaypointState.IDLE or self.state == WaypointState.STOPPED:
+                    self.nav_mode = new_mode
+                    self.get_logger().info(f"Nav mode set to: {self.nav_mode.value}")
+                else:
+                    self.get_logger().warn(
+                        "Cannot change nav_mode while navigating. Stop first.")
+
+        except Exception as e:
+            self.get_logger().error(f"Error parsing config: {e}")
+
+    def control_callback(self, msg: String):
+        """Handle control commands: start, stop, pause, resume, skip"""
+        command = msg.data.lower().strip()
+        self.get_logger().info(f"Received control command: {command}")
+
+        if command == 'start':
+            self.start_navigation()
+        elif command == 'stop':
+            self.stop_navigation()
+        elif command == 'pause':
+            self.pause_navigation()
+        elif command == 'resume':
+            self.resume_navigation()
+        elif command == 'skip':
+            self.skip_to_next()
+        else:
+            self.get_logger().warn(f"Unknown control command: {command}")
+
+    def photo_command_callback(self, msg: String):
+        """Listen for photo command responses"""
+        command = msg.data.lower().strip()
+        if command == 'stop' and self.wait_mode == WaitMode.PHOTO_COMMAND:
+            self.get_logger().info("Received 'stop' from /photo/command")
+            self.photo_stop_received = True
+
+    # ==================== NAVIGATION CONTROL ====================
+
+    def start_navigation(self):
+        """Start waypoint navigation"""
+        if not self.waypoints:
+            self.get_logger().error("No waypoints to navigate!")
+            return
+
+        if self.state not in (WaypointState.IDLE, WaypointState.STOPPED):
+            self.get_logger().warn(f"Cannot start - current state: {self.state.value}")
+            return
+
+        # Wait for appropriate action server
+        if self.nav_mode == NavMode.ROUTE:
+            self.get_logger().info("Waiting for route action server...")
+            if not self.route_client.wait_for_server(timeout_sec=10.0):
+                self.get_logger().error(
+                    "ComputeRoute action server not available! "
+                    "Is route_server running and active?")
+                return
+            self.get_logger().info("Route action server connected")
+            self.get_logger().info("Waiting for FollowPath action server...")
+            if not self.follow_path_client.wait_for_server(timeout_sec=10.0):
+                self.get_logger().error(
+                    "FollowPath action server not available! "
+                    "Is controller_server running and active?")
+                return
+            self.get_logger().info("FollowPath action server connected")
+        else:
+            self.get_logger().info("Waiting for Nav2 action server...")
+            if not self.nav_client.wait_for_server(timeout_sec=10.0):
+                self.get_logger().error("NavigateToPose action server not available!")
+                return
+            self.get_logger().info("Nav2 action server connected")
+
+        self.current_waypoint_index = 0
+        self.loop_count = 0
+        self.state = WaypointState.NAVIGATING
+
+        self.get_logger().info(
+            f"Starting waypoint navigation ({self.nav_mode.value} mode) "
+            f"with {len(self.waypoints)} waypoints")
+        self.navigate_to_current_waypoint()
+
+    def stop_navigation(self):
+        """Stop waypoint navigation"""
+        self.get_logger().warn("Stopping waypoint navigation")
+        self.publish_photo_command('no')
+
+        if self.navigation_goal_handle is not None:
+            self.navigation_goal_handle.cancel_goal_async()
+            self.navigation_goal_handle = None
+
+        if self.follow_path_goal_handle is not None:
+            self.follow_path_goal_handle.cancel_goal_async()
+            self.follow_path_goal_handle = None
+
+        self.state = WaypointState.STOPPED
+
+    def pause_navigation(self):
+        """Pause waypoint navigation"""
+        if self.state in (WaypointState.NAVIGATING, WaypointState.WAITING):
+            self.get_logger().info("Pausing waypoint navigation")
+            self.publish_photo_command('no')
+
+            if self.state == WaypointState.NAVIGATING and self.navigation_goal_handle is not None:
+                self.navigation_goal_handle.cancel_goal_async()
+
+            if self.follow_path_goal_handle is not None:
+                self.follow_path_goal_handle.cancel_goal_async()
+                self.follow_path_goal_handle = None
+
+            self.state = WaypointState.PAUSED
+
+    def resume_navigation(self):
+        """Resume waypoint navigation"""
+        if self.state == WaypointState.PAUSED:
+            self.get_logger().info("Resuming waypoint navigation")
+            self.state = WaypointState.NAVIGATING
+            self.navigate_to_current_waypoint()
+
+    def skip_to_next(self):
+        """Skip to next waypoint"""
+        if self.state in (WaypointState.NAVIGATING, WaypointState.WAITING,
+                          WaypointState.PAUSED):
+            self.get_logger().info("Skipping to next waypoint")
+            self.publish_photo_command('no')
+
+            if self.navigation_goal_handle is not None:
+                self.navigation_goal_handle.cancel_goal_async()
+
+            if self.follow_path_goal_handle is not None:
+                self.follow_path_goal_handle.cancel_goal_async()
+                self.follow_path_goal_handle = None
+
+            self.advance_to_next_waypoint()
+
+    def retry_current_waypoint_once(self):
+        """Retry current waypoint (called by timer, runs once)"""
+        if self.state == WaypointState.STOPPED:
+            return
+        self.get_logger().info(f"Retrying waypoint {self.current_waypoint_index + 1}")
+        self.state = WaypointState.NAVIGATING
+        self.navigate_to_current_waypoint()
+
+    # ==================== NAVIGATION DISPATCH ====================
+
+    def navigate_to_current_waypoint(self):
+        """Send navigation goal to current waypoint (dispatches by mode)"""
+        if self.current_waypoint_index >= len(self.waypoints):
+            self.handle_loop_completion()
+            return
+
+        wp = self.waypoints[self.current_waypoint_index]
+        wp_num = self.current_waypoint_index + 1
+        total = len(self.waypoints)
+
+        if self.nav_mode == NavMode.ROUTE:
+            self._navigate_route(wp, wp_num, total)
+        else:
+            self._navigate_pose(wp, wp_num, total)
+
+    # ==================== ROUTE MODE (ComputeRoute + FollowPath) ====================
+    # Follows Nav2 Architecture (1): Route Server computes path, Controller follows it
+    # Reference: https://github.com/ros-navigation/navigation2/tree/main/nav2_route
+
+    def _navigate_route(self, wp: Waypoint, wp_num: int, total: int):
+        """Navigate using ComputeRoute (one-shot) then FollowPath"""
+        self.follow_path_goal_handle = None
+        goal_msg = ComputeRoute.Goal()
+
+        if wp.node_id is not None:
+            # Node-ID-based navigation
+            goal_msg.use_poses = False
+            goal_msg.use_start = False  # Let route server find start from TF
+            goal_msg.goal_id = wp.node_id
+            self.get_logger().info(
+                f"[ROUTE] Computing route to waypoint {wp_num}/{total}: "
+                f"{wp.name} (node_id={wp.node_id})")
+        else:
+            # Pose-based navigation (route server finds nearest graph nodes)
+            goal_msg.use_poses = True
+            goal_msg.use_start = False
+            goal_msg.goal.header.frame_id = 'map'
+            goal_msg.goal.header.stamp = self.get_clock().now().to_msg()
+            goal_msg.goal.pose.position.x = wp.x
+            goal_msg.goal.pose.position.y = wp.y
+            goal_msg.goal.pose.position.z = 0.0
+            goal_msg.goal.pose.orientation.z = math.sin(wp.theta / 2.0)
+            goal_msg.goal.pose.orientation.w = math.cos(wp.theta / 2.0)
+            self.get_logger().info(
+                f"[ROUTE] Computing route to waypoint {wp_num}/{total}: "
+                f"{wp.name} ({wp.x:.2f}, {wp.y:.2f})")
+
+        send_goal_future = self.route_client.send_goal_async(goal_msg)
+        send_goal_future.add_done_callback(self._route_compute_response_callback)
+
+    def _route_compute_response_callback(self, future):
+        """Handle ComputeRoute goal acceptance/rejection"""
+        goal_handle = future.result()
+
+        if not goal_handle.accepted:
+            self.get_logger().error("[ROUTE] ComputeRoute goal rejected!")
+            self.get_logger().info("Retrying in 5 seconds...")
+            self.create_timer(5.0, self.retry_current_waypoint_once)
+            return
+
+        self.navigation_goal_handle = goal_handle
+        self.get_logger().info("[ROUTE] ComputeRoute goal accepted, waiting for result...")
+
+        result_future = goal_handle.get_result_async()
+        result_future.add_done_callback(self._route_compute_result_callback)
+
+    def _route_compute_result_callback(self, future):
+        """Handle ComputeRoute result — extract path and send to FollowPath"""
+        result = future.result()
+        self.navigation_goal_handle = None
+
+        if self.state in (WaypointState.PAUSED, WaypointState.STOPPED):
+            return
+
+        status = result.status
+
+        if status != 4:  # Not SUCCEEDED
+            error_code = 0
+            if hasattr(result, 'result') and hasattr(result.result, 'error_code'):
+                error_code = result.result.error_code
+            self.get_logger().error(
+                f"[ROUTE] ComputeRoute failed (status={status}, error={error_code})")
+            self.get_logger().info(
+                f"Retrying waypoint {self.current_waypoint_index + 1} in 10 seconds...")
+            self.create_timer(10.0, self.retry_current_waypoint_once)
+            return
+
+        # Extract path from result
+        path = result.result.path
+        if not path or len(path.poses) == 0:
+            self.get_logger().error("[ROUTE] ComputeRoute returned empty path!")
+            self.create_timer(10.0, self.retry_current_waypoint_once)
+            return
+
+        self.get_logger().info(
+            f"[ROUTE] Route computed: {len(path.poses)} poses. "
+            f"Sending to controller...")
+
+        # CRITICAL: Stamp the path with current time and ensure frame_id is set.
+        # The controller_server transforms poses from map→odom frame.
+        # If header.stamp is 0 or stale, TF lookup fails and all poses are
+        # dropped, resulting in "Resulting plan has 0 poses in it."
+        # Reference: https://github.com/ros-navigation/navigation2/issues/4370
+        now = self.get_clock().now().to_msg()
+        path.header.stamp = now
+        if not path.header.frame_id:
+            path.header.frame_id = 'map'
+        for pose in path.poses:
+            pose.header.stamp = now
+            if not pose.header.frame_id:
+                pose.header.frame_id = path.header.frame_id
+
+        # Step 2: Send the path to FollowPath (Controller Server)
+        fp_goal = FollowPath.Goal()
+        fp_goal.path = path
+        fp_goal.controller_id = 'FollowPath'
+
+        send_goal_future = self.follow_path_client.send_goal_async(fp_goal)
+        send_goal_future.add_done_callback(self._follow_path_response_callback)
+
+    def _follow_path_response_callback(self, future):
+        """Handle FollowPath goal acceptance"""
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().error("[ROUTE] FollowPath goal rejected by controller!")
+            self.create_timer(5.0, self.retry_current_waypoint_once)
+            return
+
+        self.follow_path_goal_handle = goal_handle
+        self.navigation_goal_handle = goal_handle  # For cancel support
+        self.get_logger().info("[ROUTE] Controller is following the path")
+
+        result_future = goal_handle.get_result_async()
+        result_future.add_done_callback(self._follow_path_result_callback)
+
+    def _follow_path_result_callback(self, future):
+        """Handle FollowPath completion — robot arrived or failed"""
+        result = future.result()
+        self.navigation_goal_handle = None
+        self.follow_path_goal_handle = None
+
+        if self.state in (WaypointState.PAUSED, WaypointState.STOPPED):
+            return
+
+        status = result.status
+
+        if status == 4:  # SUCCEEDED
+            wp = self.waypoints[self.current_waypoint_index]
+            self.get_logger().info(
+                f"[ROUTE] Arrived at waypoint {self.current_waypoint_index + 1}: {wp.name}")
+            self.handle_waypoint_arrival()
+        elif status == 5:  # CANCELED
+            self.get_logger().info("[ROUTE] Navigation canceled")
+        else:
+            self.get_logger().warn(
+                f"[ROUTE] FollowPath failed (status={status})")
+            self.get_logger().info(
+                f"Retrying waypoint {self.current_waypoint_index + 1} in 10 seconds...")
+            self.create_timer(10.0, self.retry_current_waypoint_once)
+
+    # ==================== POSE MODE (NavigateToPose) ====================
+
+    def _navigate_pose(self, wp: Waypoint, wp_num: int, total: int):
+        """Navigate using NavigateToPose action (original behavior)"""
+        self.get_logger().info(
+            f"[POSE] Navigating to waypoint {wp_num}/{total}: "
+            f"{wp.name} ({wp.x:.2f}, {wp.y:.2f})")
+
+        goal_msg = NavigateToPose.Goal()
+        goal_msg.pose.header.frame_id = 'map'
+        goal_msg.pose.header.stamp = self.get_clock().now().to_msg()
+        goal_msg.pose.pose.position.x = wp.x
+        goal_msg.pose.pose.position.y = wp.y
+        goal_msg.pose.pose.position.z = 0.0
+        goal_msg.pose.pose.orientation.z = math.sin(wp.theta / 2.0)
+        goal_msg.pose.pose.orientation.w = math.cos(wp.theta / 2.0)
+
+        send_goal_future = self.nav_client.send_goal_async(
+            goal_msg,
+            feedback_callback=self.nav_feedback_callback
+        )
+        send_goal_future.add_done_callback(self.nav_goal_response_callback)
+
+    def nav_goal_response_callback(self, future):
+        """Handle NavigateToPose goal response"""
+        goal_handle = future.result()
+
+        if not goal_handle.accepted:
+            self.get_logger().error("[POSE] Navigation goal rejected!")
+            return
+
+        self.navigation_goal_handle = goal_handle
+        self.get_logger().debug("[POSE] Navigation goal accepted")
+
+        result_future = goal_handle.get_result_async()
+        result_future.add_done_callback(self.nav_result_callback)
+
+    def nav_feedback_callback(self, feedback_msg):
+        """Handle NavigateToPose feedback"""
+        pass
+
+    def nav_result_callback(self, future):
+        """Handle NavigateToPose result"""
+        result = future.result()
+        self.navigation_goal_handle = None
+
+        if self.state in (WaypointState.PAUSED, WaypointState.STOPPED):
+            return
+
+        if result.status == 4:  # SUCCEEDED
+            self.get_logger().info(
+                f"[POSE] Arrived at waypoint {self.current_waypoint_index + 1}")
+            self.handle_waypoint_arrival()
+        elif result.status == 5:  # CANCELED
+            self.get_logger().info("[POSE] Navigation canceled")
+        else:
+            self.get_logger().warn(
+                f"[POSE] Navigation failed with status: {result.status}")
+            self.get_logger().info(
+                f"Retrying waypoint {self.current_waypoint_index + 1} in 10 seconds...")
+            self.create_timer(10.0, self.retry_current_waypoint_once)
+
+    # ==================== WAYPOINT ARRIVAL HANDLING ====================
+
+    def handle_waypoint_arrival(self):
+        """Handle arrival at a waypoint"""
+        self.state = WaypointState.WAITING
+
+        if self.wait_mode == WaitMode.PHOTO_COMMAND:
+            self.handle_photo_command_wait()
+        else:
+            self.handle_time_based_wait()
+
+    def handle_photo_command_wait(self):
+        """Wait for photo command stop signal"""
+        self.get_logger().info(
+            "Photo command mode: Publishing 'yes' to /photo/command, waiting for 'stop'")
+
+        self.photo_stop_received = False
+        self.publish_photo_command('yes')
+
+        def wait_for_stop():
+            timeout = 300.0
+            start_time = time.time()
+
+            while not self.photo_stop_received and self.state == WaypointState.WAITING:
+                if time.time() - start_time > timeout:
+                    self.get_logger().warn(
+                        "Photo command timeout - proceeding to next waypoint")
+                    break
+                time.sleep(0.1)
+
+            if self.state == WaypointState.WAITING:
+                self.publish_photo_command('no')
+                self.advance_to_next_waypoint()
+
+        thread = threading.Thread(target=wait_for_stop, daemon=True)
+        thread.start()
+
+    def handle_time_based_wait(self):
+        """Wait for configured time with photo command signals"""
+        wp_num = self.current_waypoint_index + 1
+        total_wp = len(self.waypoints)
+
+        self.get_logger().info(
+            f"Time-based mode: Waypoint {wp_num}/{total_wp} reached. "
+            f"Publishing 'yes', waiting {self.wait_time}s")
+
+        self.publish_photo_command('yes')
+
+        def wait_timer():
+            remaining = self.wait_time
+
+            while remaining > 0 and self.state == WaypointState.WAITING:
+                sleep_time = min(1.0, remaining)
+                time.sleep(sleep_time)
+                remaining -= sleep_time
+
+                if remaining > 0 and int(remaining) % 5 == 0 and \
+                        int(remaining) != int(remaining + sleep_time):
+                    self.get_logger().info(f"Wait time remaining: {int(remaining)}s")
+
+            if self.state == WaypointState.WAITING:
+                self.get_logger().info(
+                    "Wait time completed. Publishing 'no' to /photo/command")
+                self.publish_photo_command('no')
+                time.sleep(0.5)
+                self.advance_to_next_waypoint()
+
+        thread = threading.Thread(target=wait_timer, daemon=True)
+        thread.start()
+
+    def advance_to_next_waypoint(self):
+        """Move to next waypoint"""
+        self.current_waypoint_index += 1
+
+        if self.current_waypoint_index >= len(self.waypoints):
+            self.handle_loop_completion()
+        else:
+            self.state = WaypointState.NAVIGATING
+            self.navigate_to_current_waypoint()
+
+    def handle_loop_completion(self):
+        """Handle completion of all waypoints"""
+        self.loop_count += 1
+        self.get_logger().info(f"Completed loop {self.loop_count}")
+
+        if self.loop_continuous:
+            self.get_logger().info("Starting next loop...")
+            self.current_waypoint_index = 0
+            self.state = WaypointState.NAVIGATING
+            self.navigate_to_current_waypoint()
+        else:
+            self.get_logger().info("Waypoint navigation completed!")
+            self.publish_photo_command('no')
+            self.state = WaypointState.COMPLETED
+
+    # ==================== STATUS PUBLISHING ====================
+
+    def publish_status(self):
+        """Publish current status"""
+        status_data = {
+            'state': self.state.value,
+            'current_waypoint': self.current_waypoint_index + 1,
+            'total_waypoints': len(self.waypoints),
+            'loop_count': self.loop_count,
+            'wait_mode': self.wait_mode.value,
+            'nav_mode': self.nav_mode.value,
+            'loop_continuous': self.loop_continuous,
+        }
+
+        # Route-specific info is not available in ComputeRoute mode
+        # (use ComputeAndTrackRoute if real-time route tracking is needed)
+
+        status_msg = String()
+        status_msg.data = json.dumps(status_data)
+        self.status_pub.publish(status_msg)
+
+        # Current waypoint index
+        wp_msg = Int32()
+        wp_msg.data = self.current_waypoint_index
+        self.current_wp_pub.publish(wp_msg)
+
+        # Progress (0.0 to 1.0)
+        if self.waypoints:
+            progress = (
+                self.current_waypoint_index +
+                (0.5 if self.state == WaypointState.WAITING else 0)
+            ) / len(self.waypoints)
+        else:
+            progress = 0.0
+        progress_msg = Float32()
+        progress_msg.data = float(progress)
+        self.progress_pub.publish(progress_msg)
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = WaypointNavigator()
+
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()
