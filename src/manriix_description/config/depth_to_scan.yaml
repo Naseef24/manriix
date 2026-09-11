@@ -1,0 +1,51 @@
+# depthimage_to_laserscan configuration for Manriix D455
+# Source: https://github.com/ros-perception/depthimage_to_laserscan (ros2 branch)
+#         https://docs.ros.org/en/humble/p/depthimage_to_laserscan/
+#
+# Official parameters (exactly 5 — no others exist):
+#   scan_time    (float)  default: 0.033s
+#   range_min    (float)  default: 0.45m
+#   range_max    (float)  default: 10.0m
+#   scan_height  (int)    default: 1
+#   output_frame (string) default: "camera_depth_frame"
+#
+# Per official docs on output_frame:
+#   "This will probably NOT be the same frame_id as the depth image.
+#    Example: set to 'camera_depth_frame' while camera uses
+#    'camera_depth_optical_frame'."
+#
+# For D455 on Manriix:
+#   camera publishes in: camera_depth_optical_frame
+#   output_frame set to: camera_link  (non-optical equivalent in our URDF)
+#
+# Topics (remapped in launch file):
+#   Subscribes: depth              → /camera/depth/image_rect_raw_fixed
+#   Subscribes: depth_camera_info → /camera/depth/camera_info_fixed
+#   Publishes:  scan               → /scan_rear
+
+depthimage_to_laserscan:
+  ros__parameters:
+
+    # Time between scans — set to match D455 depth stream rate (15Hz = 0.067s)
+    # Default: 0.033 (30Hz)
+    scan_time: 0.067
+
+    # Minimum valid range — D455 minimum reliable depth is 0.4m
+    # Default: 0.45 — keeping at official default as D455 spec matches
+    range_min: 0.45
+
+    # Maximum valid range — limited to 6m for indoor use
+    # D455 max is 6m indoor, 20m outdoor
+    # Default: 10.0
+    range_max: 6.0
+
+    # Number of image rows to use for scan — center of image
+    # Higher values = more averaging, more CPU
+    # Default: 1
+    scan_height: 1
+
+    # Output frame for LaserScan header
+    # Per official docs: NOT the optical frame
+    # Our URDF: camera_link is the non-optical D455 frame
+    # Default: "camera_depth_frame"
+    output_frame: camera_link

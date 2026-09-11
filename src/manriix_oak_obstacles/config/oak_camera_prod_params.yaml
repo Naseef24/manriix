@@ -1,0 +1,18 @@
+# Production OAK-D Pro W driver params.
+# Node name is 'oak_d_pro_w' (must match URDF camera_name so data
+# frame_ids == URDF frames; i_tf_base_frame defaults to the camera name,
+# which equals the URDF base_frame='oak_d_pro_w').
+/oak_d_pro_w:
+  ros__parameters:
+    camera:
+      i_nn_type: spatial
+      i_publish_tf_from_calibration: false   # URDF/RSP owns all camera TF
+    nn:
+      i_nn_family: mobilenet
+      i_enable_passthrough: true
+    stereo:
+      i_align_depth: true
+      i_board_socket_id: 0    # CAM_A / RGB — must match the NN socket
+      i_subpixel: true
+      i_width: 640
+      i_height: 400

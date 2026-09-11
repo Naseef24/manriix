@@ -15,8 +15,12 @@ This extracts photo control logic from the monolithic clustering node.
 """
 
 import rclpy
-from rclpy.node import Node
+from rclpy.lifecycle import LifecycleNode, State, TransitionCallbackReturn
+from rclpy.action import ActionServer, CancelResponse, GoalResponse
+from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.qos import QoSProfile, ReliabilityPolicy
+from rcl_interfaces.msg import SetParametersResult
+from manriix_perception.action import TakePhoto
 import numpy as np
 from typing import Dict, List, Optional, Tuple
 import time
@@ -24,8 +28,6 @@ import yaml
 import os
 from dataclasses import dataclass
 from enum import Enum
-
-
 
 from std_msgs.msg import String, Bool, Float32
 from geometry_msgs.msg import Point
@@ -63,7 +65,7 @@ class GroupFormationAnalysis:
     stability_duration: float = 0.0 # How long formation has been stable
     
 
-class PhotoIntelligenceSystem(Node):
+class PhotoIntelligenceSystem(LifecycleNode):
     """
     Advanced photo timing system with crowd intelligence.
     
@@ -79,137 +81,337 @@ class PhotoIntelligenceSystem(Node):
     def __init__(self):
         super().__init__('photo_intelligence_system')
         
-        # Initialize parameter validator and load validated configuration
-        validator = ParameterValidator(self)
-        
-        # Load and validate photo intelligence configuration
-        config = ConfigValidator.validate_photo_intelligence_config(validator)
-        
-        # Set validated parameters
-        self.min_duration = config['min_duration']
-        self.max_duration = config['max_duration']
-        self.base_duration = config['base_duration']
-        self.evaluation_time = config['evaluation_time']
-        self.cooldown_time = config['cooldown_time']
-        self.single_duration = config['single_person_duration']
-        self.small_group_duration = config['small_group_duration']
-        self.circle_bonus = config['circle_formation_bonus']
-        self.enable_multi_shot = config['enable_multi_shot']
-        self.multi_shot_threshold = config['multi_shot_threshold']
-        
-        # Additional parameters with individual validation
-        self.medium_group_duration = validator.declare_and_validate(
-            'medium_group_duration', 70.0, min_val=30.0, max_val=120.0,
-            description="Medium group photo duration"
-        )
-        self.large_group_duration = validator.declare_and_validate(
-            'large_group_duration', 90.0, min_val=40.0, max_val=120.0,
-            description="Large group photo duration"
-        )
-        self.line_bonus = validator.declare_and_validate(
-            'line_formation_bonus', 15.0, min_val=0.0, max_val=30.0,
-            description="Line formation time bonus"
-        )
-        self.formal_bonus = validator.declare_and_validate(
-            'formal_pose_bonus', 20.0, min_val=0.0, max_val=40.0,
-            description="Formal/posed formation time bonus"
-        )
-        self.stable_reduction = validator.declare_and_validate(
-            'stable_group_reduction', 10.0, min_val=0.0, max_val=30.0,
-            description="Time reduction for stable groups"
-        )
-        self.shot_interval = validator.declare_and_validate(
-            'shot_interval', 5.0, min_val=1.0, max_val=15.0,
-            description="Interval between multi-shots"
-        )
-        self.max_shots = validator.declare_and_validate(
-            'max_shots', 3, min_val=1, max_val=5,
-            description="Maximum shots per sequence"
-        )
-        self.stability_threshold = validator.declare_and_validate(
-            'stability_threshold', 2.0, min_val=0.5, max_val=10.0,
-            description="Formation stability threshold"
-        )
-        
-        # Additional timing adjustments with validation
-        self.unstable_addition = validator.declare_and_validate(
-            'unstable_group_addition', 15.0, min_val=0.0, max_val=30.0
-        )
-        self.high_movement_reduction = validator.declare_and_validate(
-            'high_movement_reduction', 15.0, min_val=0.0, max_val=30.0
-        )
-        self.low_movement_addition = validator.declare_and_validate(
-            'low_movement_addition', 10.0, min_val=0.0, max_val=20.0
-        )
-        self.high_attention_bonus = validator.declare_and_validate(
-            'high_attention_bonus', 10.0, min_val=0.0, max_val=20.0
-        )
-        self.low_attention_reduction = validator.declare_and_validate(
-            'low_attention_reduction', 10.0, min_val=0.0, max_val=20.0
-        )
-        self.high_density_addition = validator.declare_and_validate(
-            'high_density_addition', 10.0, min_val=0.0, max_val=20.0
-        )
-        
-        # State management
-        self.current_state = PhotoState.IDLE
-        self.photo_start_time = None
-        self.evaluation_start_time = None
-        self.current_intelligence = PhotoIntelligence()
-        self.formation_history = []  # Track formation changes over time
-        self.last_clusters = []
-        self.stability_start_time = None
-        
-        # QoS profiles
-        qos_reliable = QoSProfile(reliability=ReliabilityPolicy.RELIABLE, depth=5)
-        qos_best_effort = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, depth=3)
-        
-        # Subscribers - input from perception system
-        self.clusters_sub = self.create_subscription(
-            ClusterArray,
-            '/human_clustering/clusters',
-            self.clusters_callback,
-            qos_reliable
-        )
-        
-        self.photo_trigger_sub = self.create_subscription(
-            Bool,
-            '/photo/intelligence/trigger',  # Mission controller triggers photo session
-            self.photo_trigger_callback,
-            qos_reliable
-        )
-        
-        # Publishers - output commands
-        self.photo_command_pub = self.create_publisher(
-            String,
-            '/photo/command',  # Compatible with friend's Canon R6 system
-            qos_reliable
-        )
-        
-        self.photo_status_pub = self.create_publisher(
-            String,
-            '/photo/intelligence/status',  # For mission controller
-            qos_reliable
-        )
-        
-        self.intelligence_metrics_pub = self.create_publisher(
-            String,
-            '/photo/intelligence/metrics',  # Debug info
-            qos_best_effort
-        )
-        
-        # Control timer for state machine
-        self.control_timer = self.create_timer(0.5, self.control_loop)
-        self.cooldown_timer = None  # One-shot timer for cooldown period
+    def on_configure(self, state: State) -> TransitionCallbackReturn:
+        """Load config, create subs/pubs, register param callback."""
+        self.get_logger().info("Configuring PhotoIntelligenceSystem...")
+        try:
+            # Parameters already declared in __init__ on first configure.
+            # On reconfigure after cascade, skip re-declaration.
+            _reconfiguring = self.has_parameter('min_duration')
+            validator = ParameterValidator(self)
+            config = ConfigValidator.validate_photo_intelligence_config(validator)
 
-        self.get_logger().info("PhotoIntelligenceSystem initialized with CONFIGURABLE timing:")
-        self.get_logger().info(f"  Timing range: {self.min_duration}s - {self.max_duration}s")
-        self.get_logger().info(f"  Base duration: {self.base_duration}s")
-        self.get_logger().info(f"  Group sizes: Single:{self.single_duration}s Small:{self.small_group_duration}s Med:{self.medium_group_duration}s Large:{self.large_group_duration}s")
-        self.get_logger().info(f"  Multi-shot: {'Enabled' if self.enable_multi_shot else 'Disabled'} (threshold: {self.multi_shot_threshold} people)")
-        self.get_logger().info(f"  Formation bonuses: Circle:+{self.circle_bonus}s Line:+{self.line_bonus}s Formal:+{self.formal_bonus}s")
-        
-        
+            self.min_duration = config['min_duration']
+            self.max_duration = config['max_duration']
+            self.base_duration = config['base_duration']
+            self.evaluation_time = config['evaluation_time']
+            self.cooldown_time = config['cooldown_time']
+            self.single_duration = config['single_person_duration']
+            self.small_group_duration = config['small_group_duration']
+            self.circle_bonus = config['circle_formation_bonus']
+            self.enable_multi_shot = config['enable_multi_shot']
+            self.multi_shot_threshold = config['multi_shot_threshold']
+
+            self.medium_group_duration = validator.declare_and_validate(
+                'medium_group_duration', 70.0, min_val=30.0, max_val=120.0,
+                description="Medium group photo duration")
+            self.large_group_duration = validator.declare_and_validate(
+                'large_group_duration', 90.0, min_val=40.0, max_val=120.0,
+                description="Large group photo duration")
+            self.line_bonus = validator.declare_and_validate(
+                'line_formation_bonus', 15.0, min_val=0.0, max_val=30.0,
+                description="Line formation time bonus")
+            self.formal_bonus = validator.declare_and_validate(
+                'formal_pose_bonus', 20.0, min_val=0.0, max_val=40.0,
+                description="Formal/posed formation time bonus")
+            self.stable_reduction = validator.declare_and_validate(
+                'stable_group_reduction', 10.0, min_val=0.0, max_val=30.0,
+                description="Time reduction for stable groups")
+            self.shot_interval = validator.declare_and_validate(
+                'shot_interval', 5.0, min_val=1.0, max_val=15.0,
+                description="Interval between multi-shots")
+            self.max_shots = validator.declare_and_validate(
+                'max_shots', 3, min_val=1, max_val=5,
+                description="Maximum shots per sequence")
+            self.stability_threshold = validator.declare_and_validate(
+                'stability_threshold', 2.0, min_val=0.5, max_val=10.0,
+                description="Formation stability threshold")
+            self.unstable_addition = validator.declare_and_validate(
+                'unstable_group_addition', 15.0, min_val=0.0, max_val=30.0)
+            self.high_movement_reduction = validator.declare_and_validate(
+                'high_movement_reduction', 15.0, min_val=0.0, max_val=30.0)
+            self.low_movement_addition = validator.declare_and_validate(
+                'low_movement_addition', 10.0, min_val=0.0, max_val=20.0)
+            self.high_attention_bonus = validator.declare_and_validate(
+                'high_attention_bonus', 10.0, min_val=0.0, max_val=20.0)
+            self.low_attention_reduction = validator.declare_and_validate(
+                'low_attention_reduction', 10.0, min_val=0.0, max_val=20.0)
+            self.high_density_addition = validator.declare_and_validate(
+                'high_density_addition', 10.0, min_val=0.0, max_val=20.0)
+
+            # State
+            self.current_state = PhotoState.IDLE
+            self.photo_start_time = None
+            self.evaluation_start_time = None
+            self.current_intelligence = PhotoIntelligence()
+            self.formation_history = []
+            self.last_clusters = []
+            self.stability_start_time = None
+
+            # QoS
+            qos_reliable = QoSProfile(reliability=ReliabilityPolicy.RELIABLE, depth=5)
+            qos_best_effort = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, depth=3)
+
+            # Subscribers
+            self.clusters_sub = self.create_subscription(
+                ClusterArray, '/human_clustering/clusters',
+                self.clusters_callback, qos_reliable)
+            self.photo_trigger_sub = self.create_subscription(
+                Bool, '/photo/intelligence/trigger',
+                self.photo_trigger_callback, qos_reliable)
+
+            # Publishers
+            self.photo_command_pub = self.create_publisher(
+                String, '/photo/command', qos_reliable)
+            self.photo_status_pub = self.create_publisher(
+                String, '/photo/intelligence/status', qos_reliable)
+            self.intelligence_metrics_pub = self.create_publisher(
+                String, '/photo/intelligence/metrics', qos_best_effort)
+
+            # Action server — replaces Bool trigger + String status pattern
+            self._action_cb_group = ReentrantCallbackGroup()
+            self._current_goal_handle = None
+            self._action_server = ActionServer(
+                self,
+                TakePhoto,
+                'take_photo',
+                execute_callback=self._execute_take_photo,
+                goal_callback=self._goal_callback,
+                cancel_callback=self._cancel_callback,
+                callback_group=self._action_cb_group,
+            )
+            
+            # Live parameter updates
+            self.add_on_set_parameters_callback(self._on_parameters_changed)
+
+            self.get_logger().info("PhotoIntelligenceSystem configured:")
+            self.get_logger().info(f"  Timing range: {self.min_duration}s - {self.max_duration}s")
+            self.get_logger().info(f"  Group sizes: Single:{self.single_duration}s Small:{self.small_group_duration}s Med:{self.medium_group_duration}s Large:{self.large_group_duration}s")
+            return TransitionCallbackReturn.SUCCESS
+
+        except Exception as e:
+            self.get_logger().error(f"Configuration failed: {e}")
+            return TransitionCallbackReturn.FAILURE
+
+    def on_activate(self, state: State) -> TransitionCallbackReturn:
+        """Start control loop."""
+        self.get_logger().info("Activating PhotoIntelligenceSystem...")
+        try:
+            self.cooldown_timer = None
+            self.control_timer = self.create_timer(0.5, self.control_loop)
+            self.get_logger().info("PhotoIntelligenceSystem active")
+            return TransitionCallbackReturn.SUCCESS
+        except Exception as e:
+            self.get_logger().error(f"Activation failed: {e}")
+            return TransitionCallbackReturn.FAILURE
+
+    def on_deactivate(self, state: State) -> TransitionCallbackReturn:
+        """Stop control loop, cancel active goal, stop camera."""
+        self.get_logger().info("Deactivating PhotoIntelligenceSystem...")
+        try:
+            if hasattr(self, '_current_goal_handle') and self._current_goal_handle:
+                self._current_goal_handle.canceled()
+                self._current_goal_handle = None
+            if hasattr(self, 'control_timer') and self.control_timer:
+                self.control_timer.cancel()
+                self.control_timer = None
+            if hasattr(self, 'cooldown_timer') and self.cooldown_timer:
+                self.cooldown_timer.cancel()
+                self.cooldown_timer = None
+            return TransitionCallbackReturn.SUCCESS
+        except Exception as e:
+            self.get_logger().error(f"Deactivation failed: {e}")
+            return TransitionCallbackReturn.FAILURE
+
+    def on_cleanup(self, state: State) -> TransitionCallbackReturn:
+        """Release resources."""
+        self.get_logger().info("Cleaning up PhotoIntelligenceSystem...")
+        try:
+            self.current_state = PhotoState.IDLE
+            self.photo_start_time = None
+            self.formation_history = []
+            self.last_clusters = []
+            return TransitionCallbackReturn.SUCCESS
+        except Exception as e:
+            self.get_logger().error(f"Cleanup failed: {e}")
+            return TransitionCallbackReturn.FAILURE
+
+    def on_shutdown(self, state: State) -> TransitionCallbackReturn:
+        """Stop camera and cancel timers."""
+        self.get_logger().info("Shutting down PhotoIntelligenceSystem...")
+        try:
+            if hasattr(self, 'photo_command_pub'):
+                stop_msg = String()
+                stop_msg.data = "no"
+                self.photo_command_pub.publish(stop_msg)
+            if hasattr(self, 'control_timer') and self.control_timer:
+                self.control_timer.cancel()
+            if hasattr(self, 'cooldown_timer') and self.cooldown_timer:
+                self.cooldown_timer.cancel()
+            return TransitionCallbackReturn.SUCCESS
+        except Exception as e:
+            self.get_logger().error(f"Shutdown failed: {e}")
+            return TransitionCallbackReturn.FAILURE
+
+    def _goal_callback(self, goal_request):
+        """Accept goal only when idle."""
+        if self.current_state != PhotoState.IDLE:
+            self.get_logger().warn("TakePhoto goal rejected — session already active")
+            return GoalResponse.REJECT
+        self.get_logger().info(
+            f"TakePhoto goal accepted — group={goal_request.group_size} "
+            f"requested={goal_request.requested_duration}s")
+        return GoalResponse.ACCEPT
+
+    def _cancel_callback(self, goal_handle):
+        """Always accept cancel requests."""
+        self.get_logger().info("TakePhoto cancel requested")
+        return CancelResponse.ACCEPT
+
+    def _execute_take_photo(self, goal_handle):
+        """
+        Main action execute callback — runs entire photo session.
+        Replaces the Bool trigger + String status pattern.
+        """
+        import threading
+        self._current_goal_handle = goal_handle
+        feedback = TakePhoto.Feedback()
+        result = TakePhoto.Result()
+        photos_taken = 0
+        interrupted = False
+        stop_reason = "completed"
+
+        try:
+            # Override duration if requested
+            if goal_handle.request.requested_duration > 0:
+                override_duration = float(goal_handle.request.requested_duration)
+            else:
+                override_duration = None
+
+            # ── EVALUATION PHASE ──
+            self.current_state = PhotoState.EVALUATING
+            self.evaluation_start_time = time.time()
+            status_msg = String()
+            status_msg.data = "evaluating"
+            self.photo_status_pub.publish(status_msg)
+            self.get_logger().info("TakePhoto: evaluating crowd...")
+
+            eval_deadline = time.time() + self.evaluation_time
+            while time.time() < eval_deadline:
+                if goal_handle.is_cancel_requested:
+                    interrupted = True
+                    stop_reason = "cancelled_during_evaluation"
+                    break
+                time.sleep(0.1)
+
+            if interrupted:
+                self._finish_action(goal_handle, result, photos_taken, 0.0, True, stop_reason)
+                return result
+
+            # ── ACTIVE PHASE ──
+            session_duration = override_duration or self.current_intelligence.optimal_duration
+            self.current_state = PhotoState.ACTIVE
+            self.photo_start_time = time.time()
+
+            cmd = String()
+            cmd.data = "yes"
+            self.photo_command_pub.publish(cmd)
+            photos_taken = 1
+
+            status_msg.data = "active"
+            self.photo_status_pub.publish(status_msg)
+            self.get_logger().info(
+                f"TakePhoto: session started — {session_duration:.1f}s")
+
+            session_end = time.time() + session_duration
+            while time.time() < session_end:
+                if goal_handle.is_cancel_requested:
+                    interrupted = True
+                    stop_reason = "cancelled_during_session"
+                    break
+
+                # Publish feedback
+                feedback.elapsed_time = float(time.time() - self.photo_start_time)
+                feedback.current_group_size = self.current_intelligence.group_size
+                feedback.formation_type = str(getattr(
+                    self.current_intelligence, 'formation_type', 'unknown'))
+                feedback.calculated_duration = float(session_duration)
+                goal_handle.publish_feedback(feedback)
+                time.sleep(0.5)
+
+            actual_duration = float(time.time() - self.photo_start_time)
+
+        except Exception as e:
+            self.get_logger().error(f"Error in TakePhoto execute: {e}")
+            interrupted = True
+            stop_reason = f"error: {e}"
+            actual_duration = 0.0
+
+        self._finish_action(goal_handle, result, photos_taken, actual_duration, interrupted, stop_reason)
+        return result
+
+    def _finish_action(self, goal_handle, result, photos_taken, actual_duration, interrupted, stop_reason):
+        """Stop camera, enter cooldown, publish result."""
+        try:
+            # Stop camera
+            cmd = String()
+            cmd.data = "no"
+            self.photo_command_pub.publish(cmd)
+
+            # Publish status
+            status_msg = String()
+            status_msg.data = "completed"
+            self.photo_status_pub.publish(status_msg)
+
+            # Enter cooldown
+            self.current_state = PhotoState.COOLDOWN
+            self.cooldown_timer = self.create_timer(
+                self.cooldown_time, self._cooldown_timer_callback)
+
+            # Fill result
+            result.photos_taken = photos_taken
+            result.actual_duration = actual_duration
+            result.interrupted = interrupted
+            result.stop_reason = stop_reason
+
+            self._current_goal_handle = None
+
+            if interrupted:
+                goal_handle.canceled()
+                self.get_logger().info(f"TakePhoto CANCELLED: {stop_reason}")
+            else:
+                goal_handle.succeed()
+                self.get_logger().info(
+                    f"TakePhoto SUCCEEDED: {photos_taken} photos, {actual_duration:.1f}s")
+
+        except Exception as e:
+            self.get_logger().error(f"Error finishing action: {e}")
+
+    def _on_parameters_changed(self, params):
+        """Handle runtime parameter changes — takes effect immediately without restart."""
+        for p in params:
+            if p.name == 'min_duration':
+                self.min_duration = float(p.value)
+                self.get_logger().info(f"min_duration updated to {self.min_duration}s")
+            elif p.name == 'max_duration':
+                self.max_duration = float(p.value)
+                self.get_logger().info(f"max_duration updated to {self.max_duration}s")
+            elif p.name == 'base_duration':
+                self.base_duration = float(p.value)
+                self.get_logger().info(f"base_duration updated to {self.base_duration}s")
+            elif p.name == 'single_person_duration':
+                self.single_duration = float(p.value)
+                self.get_logger().info(f"single_person_duration updated to {self.single_duration}s")
+            elif p.name == 'small_group_duration':
+                self.small_group_duration = float(p.value)
+                self.get_logger().info(f"small_group_duration updated to {self.small_group_duration}s")
+            elif p.name == 'medium_group_duration':
+                self.medium_group_duration = float(p.value)
+                self.get_logger().info(f"medium_group_duration updated to {self.medium_group_duration}s")
+            elif p.name == 'large_group_duration':
+                self.large_group_duration = float(p.value)
+                self.get_logger().info(f"large_group_duration updated to {self.large_group_duration}s")
+        return SetParametersResult(successful=True)       
         
     def clusters_callback(self, msg: ClusterArray):
         """Process cluster information for intelligence analysis"""
@@ -225,8 +427,11 @@ class PhotoIntelligenceSystem(Node):
                 }
                 clusters.append(cluster)
                 
-            # Update intelligence analysis
-            self.analyze_crowd_intelligence(clusters)
+            # Update intelligence — but not during an active session
+            # Action server reads current_intelligence.optimal_duration continuously
+            # Overwriting it mid-session causes control_loop to end the session early
+            if self.current_state not in (PhotoState.ACTIVE, PhotoState.MULTI_SHOT):
+                self.analyze_crowd_intelligence(clusters)
             self.last_clusters = clusters
             
         except Exception as e:
@@ -430,7 +635,10 @@ class PhotoIntelligenceSystem(Node):
     def calculate_optimal_timing(self, group_size: int, density: float, 
                                formation: GroupFormationAnalysis, movement: float, 
                                attention: float) -> Tuple[float, int]:
-        """Calculate optimal photo duration and number of shots (NOW FULLY CONFIGURABLE!)"""
+        """Calculate optimal photo duration and number of shots"""
+        
+        # return 10, 1   ## TEMP : modification for testing only
+        
         try:
             # Base duration from group size (configurable)
             if group_size == 1:
@@ -506,8 +714,12 @@ class PhotoIntelligenceSystem(Node):
     def control_loop(self):
         """Main state machine control loop"""
         try:
+            # Action server owns the session — control_loop must not interfere
+            if self._current_goal_handle is not None:
+                return
+
             current_time = time.time()
-            
+
             if self.current_state == PhotoState.EVALUATING:
                 # Evaluation phase - analyze crowd for optimal timing
                 if self.evaluation_start_time and \
@@ -558,9 +770,9 @@ class PhotoIntelligenceSystem(Node):
             self.current_state = PhotoState.ACTIVE
             self.photo_start_time = time.time()
             
-            # Send START command to Canon R6
+            # Send 'yes' command to Canon R6
             command_msg = String()
-            command_msg.data = "START"
+            command_msg.data = "yes"
             self.photo_command_pub.publish(command_msg)
             
             # Update status
@@ -577,9 +789,9 @@ class PhotoIntelligenceSystem(Node):
     def stop_photo_session(self):
         """Stop photo session and enter cooldown"""
         try:
-            # Send STOP command to Canon R6
+            # Send 'no' command to Canon R6
             command_msg = String()
-            command_msg.data = "STOP"
+            command_msg.data = "no"
             self.photo_command_pub.publish(command_msg)
             
             # Enter cooldown state
@@ -622,15 +834,30 @@ class PhotoIntelligenceSystem(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = PhotoIntelligenceSystem()
-    
+
+    # Signal handler to stop camera before ROS2 shutdown
+    import signal
+    def shutdown_handler(sig, frame):
+        try:
+            stop_msg = String()
+            stop_msg.data = "no"
+            node.photo_command_pub.publish(stop_msg)
+            node.get_logger().info("📷 Camera stop sent on signal")
+            rclpy.spin_once(node, timeout_sec=0.5)
+        except Exception:
+            pass
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGINT, shutdown_handler)
+
+    executor = rclpy.executors.MultiThreadedExecutor()
+    executor.add_node(node)
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
         node.destroy_node()
         rclpy.shutdown()
-
 
 if __name__ == '__main__':
     main()

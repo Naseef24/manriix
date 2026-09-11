@@ -12,6 +12,14 @@
   <depend>launch</depend>
   <depend>launch_ros</depend>
   <depend>rviz2</depend>
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>realsense2_camera</depend>
+  <depend>depthimage_to_laserscan</depend>
+  <depend>dual_laser_merger</depend>
+
+  <exec_depend>manriix_interfaces</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

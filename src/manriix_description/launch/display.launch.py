@@ -6,7 +6,7 @@ from launch_ros.actions import Node
 def generate_launch_description():
     pkg_path = get_package_share_directory("manriix_description")
     # urdf_file = os.path.join(pkg_path, 'urdf', 'manriix_mock_hw.urdf')
-    urdf_file = os.path.join(pkg_path, 'urdf', 'manriix.urdf.xacro')
+    urdf_file = os.path.join(pkg_path, 'urdf', 'manriix3.urdf.xacro')
 
     with open(urdf_file, 'r') as file:
         robot_description = file.read()

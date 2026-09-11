@@ -7,15 +7,34 @@
 #include <unistd.h>
 #include <cstring>
 #include <iostream>
+#include <chrono>
+
+#define C_RESET    "\033[0m"
+#define C_BOLD     "\033[1m"
+#define C_THREAD   "\033[36m"   // cyan
+#define C_WARN     "\033[33m"   // yellow
+#define C_ERROR    "\033[31m"   // red
+#define C_ACTIVE   "\033[32m"   // green
 
 namespace manriix_hardware
 {
 
 ZltechInterface::ZltechInterface()
   : can_socket_(-1), driver1_id_(0x601), driver2_id_(0x602),
-    last_velocities_(4, 0.0), invert_right_motors_(true)
+    driver1_tpdo_id_(0x181), driver2_tpdo_id_(0x182),
+    last_velocities_(4, 0.0), invert_right_motors_(true),
+    actual_velocities_(4, 0.0)
 {
 }
+
+// Previous setup (older reference, keep for easy swap):
+// ZltechInterface::ZltechInterface()
+//   : can_socket_(-1), driver1_id_(0x601), driver2_id_(0x602),
+//     driver1_tpdo_id_(0x181), driver2_tpdo_id_(0x182),
+//     last_velocities_(4, 0.0), invert_right_motors_(false),
+//     actual_velocities_(4, 0.0)
+// {
+// }
 
 ZltechInterface::~ZltechInterface()
 {
@@ -58,10 +77,26 @@ bool ZltechInterface::init(const std::string& can_interface, uint16_t driver1_id
     return false;
   }
 
-  std::cout << "Zltech interface initialized on " << can_interface 
-            << " with driver IDs 0x" << std::hex << driver1_id 
-            << ", 0x" << driver2_id << std::dec << std::endl;
+  // std::cout << "Zltech interface initialized on " << can_interface 
+  //           << " with driver IDs 0x" << std::hex << driver1_id 
+  //           << ", 0x" << driver2_id << std::dec << std::endl;
   
+  // return true;
+
+  // Calculate TPDO COB-IDs from node IDs
+  // CANopen: TPDO0 COB-ID = 0x180 + node_id
+  // driver1_id = 0x601 → node_id = 0x01 → TPDO = 0x181
+  // driver2_id = 0x602 → node_id = 0x02 → TPDO = 0x182
+  driver1_tpdo_id_ = 0x180 + (driver1_id & 0x7F);
+  driver2_tpdo_id_ = 0x180 + (driver2_id & 0x7F);
+
+  std::cout << C_ACTIVE "[ZLTECH]" C_RESET
+            << " Initialized on " << can_interface
+            << " driver IDs 0x" << std::hex << driver1_id
+            << "/0x" << driver2_id
+            << " TPDO IDs 0x" << driver1_tpdo_id_
+            << "/0x" << driver2_tpdo_id_ << std::dec << std::endl;
+
   return true;
 }
 
@@ -83,8 +118,158 @@ bool ZltechInterface::initiateDrivers()
     usleep(10000);
   }
 
-  std::cout << "Zltech drivers initiated" << std::endl;
+  // std::cout << "Zltech drivers initiated" << std::endl;
+  // return true;
+  std::cout << C_ACTIVE "[ZLTECH]" C_RESET
+            << " Drivers initiated — configuring TPDO..." << std::endl;
+
+  // Configure TPDO0 on each driver for automatic velocity broadcast
+  if (!configureTPDO(driver1_id_, driver1_tpdo_id_)) {
+    std::cout << C_WARN "[ZLTECH]" C_RESET
+              << " TPDO config failed for driver1 — will use SDO fallback" << std::endl;
+  }
+  usleep(20000);
+  if (!configureTPDO(driver2_id_, driver2_tpdo_id_)) {
+    std::cout << C_WARN "[ZLTECH]" C_RESET
+              << " TPDO config failed for driver2 — will use SDO fallback" << std::endl;
+  }
+  usleep(20000);
+
+  // Send NMT start command to enable PDO on all nodes
+  // COB-ID 0x000, data: 01 00 (start all nodes)
+  std::vector<uint8_t> nmt_start = {0x01, 0x00};
+  if (!sendCANMessage(0x000, nmt_start)) {
+    std::cout << C_WARN "[ZLTECH]" C_RESET
+              << " NMT start command failed" << std::endl;
+  }
+  usleep(10000);
+
+  std::cout << C_ACTIVE "[ZLTECH]" C_RESET
+            << " Drivers ready — TPDO configured" << std::endl;
   return true;
+}
+
+bool ZltechInterface::configureTPDO(uint16_t driver_id, uint16_t tpdo_id)
+{
+  // Per Zltech manual section 6.1 TPDO MAPPING
+  // Map 0x606C sub-index 03 (combined left+right velocity) to TPDO0
+  // TPDO0 will broadcast on COB-ID 0x180 + node_id automatically
+
+  // Step 1 — clear existing TPDO0 mapping
+  std::vector<uint8_t> clear_map = {0x2F, 0x00, 0x1A, 0x00, 0x00, 0x00, 0x00, 0x00};
+  if (!sendCANMessage(driver_id, clear_map)) return false;
+  usleep(10000);
+
+  // Step 2 — map 0x606C sub-index 03 to TPDO0 mapping 1
+  // 0x606C = velocity feedback, sub 03 = combined L+R, 0x20 = 32 bits
+  std::vector<uint8_t> map_vel = {0x23, 0x00, 0x1A, 0x01, 0x20, 0x03, 0x6C, 0x60};
+  if (!sendCANMessage(driver_id, map_vel)) return false;
+  usleep(10000);
+
+  // Step 3 — set transmission type to timer trigger (0xFF = event, 0xFE = timer)
+  std::vector<uint8_t> set_timer = {0x2F, 0x00, 0x18, 0x02, 0xFF, 0x00, 0x00, 0x00};
+  if (!sendCANMessage(driver_id, set_timer)) return false;
+  usleep(10000);
+
+  // Step 4 — set event timer to 100ms (0x64 = 100 in ms units)
+  std::vector<uint8_t> set_interval = {0x2B, 0x00, 0x18, 0x05, 0x64, 0x00, 0x00, 0x00};
+  if (!sendCANMessage(driver_id, set_interval)) return false;
+  usleep(10000);
+
+  // Step 5 — enable 1 mapping on TPDO0
+  std::vector<uint8_t> enable_map = {0x2F, 0x00, 0x1A, 0x00, 0x01, 0x00, 0x00, 0x00};
+  if (!sendCANMessage(driver_id, enable_map)) return false;
+  usleep(10000);
+
+  // Step 6 — save to EEPROM so config persists across power cycles
+  std::vector<uint8_t> save = {0x2B, 0x10, 0x20, 0x00, 0x01, 0x00, 0x00, 0x00};
+  if (!sendCANMessage(driver_id, save)) return false;
+  usleep(50000);  // EEPROM write needs longer delay
+
+  std::cout << C_THREAD "[TPDO]" C_RESET
+            << " Driver 0x" << std::hex << driver_id
+            << " configured → broadcasting on 0x" << tpdo_id
+            << std::dec << std::endl;
+  return true;
+}
+
+void ZltechInterface::startReceiveThread()
+{
+  if (thread_running_) return;
+  thread_running_ = true;
+  receive_thread_ = std::thread(&ZltechInterface::receiveLoop, this);
+  std::cout << C_THREAD C_BOLD "[THREAD]" C_RESET
+            << " Zltech receive thread started on " << can_interface_ << std::endl;
+}
+
+void ZltechInterface::stopReceiveThread()
+{
+  if (!thread_running_) return;
+  thread_running_ = false;
+  if (receive_thread_.joinable()) {
+    receive_thread_.join();
+  }
+  std::cout << C_THREAD C_BOLD "[THREAD]" C_RESET
+            << " Zltech receive thread stopped" << std::endl;
+}
+
+void ZltechInterface::receiveLoop()
+{
+  struct can_frame frame;
+
+  while (thread_running_) {
+    if (can_socket_ < 0) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      continue;
+    }
+
+    // Non-blocking read
+    ssize_t nbytes = read(can_socket_, &frame, sizeof(frame));
+
+    if (nbytes == sizeof(frame)) {
+      // Only process standard frames (Zltech TPDO)
+      // Skip extended frames (those are CubeMars on the same bus)
+      if (frame.can_id & CAN_EFF_FLAG) continue;
+
+      uint16_t cob_id = frame.can_id & 0x7FF;
+
+      // Only process TPDO frames from our two drivers
+      if (cob_id != driver1_tpdo_id_ && cob_id != driver2_tpdo_id_) continue;
+
+      // TPDO data layout from manual section 6.1:
+      // data[0-1]: left motor speed  (int16, 0.1 RPM units, little-endian)
+      // data[2-3]: right motor speed (int16, 0.1 RPM units, little-endian)
+      if (frame.can_dlc < 4) continue;
+
+      int16_t left_raw  = static_cast<int16_t>(frame.data[0] | (frame.data[1] << 8));
+      int16_t right_raw = static_cast<int16_t>(frame.data[2] | (frame.data[3] << 8));
+
+      // Convert from 0.1 RPM units to RPM
+      double left_rpm  = left_raw  * 0.1;
+      double right_rpm = right_raw * 0.1;
+
+      std::lock_guard<std::mutex> lock(velocities_mutex_);
+
+      if (cob_id == driver1_tpdo_id_) {
+        // Driver 1 = left side: FL=index 0, RL=index 2
+        actual_velocities_[0] = -left_rpm;   // FL (inverted — left side)
+        actual_velocities_[2] = -right_rpm;  // RL (inverted — left side)
+      } else {
+        // Driver 2 = right side: FR=index 1, RR=index 3
+        actual_velocities_[1] = left_rpm;    // FR
+        actual_velocities_[3] = right_rpm;   // RR
+      }
+
+    } else {
+      std::this_thread::sleep_for(std::chrono::microseconds(500));
+    }
+  }
+}
+
+void ZltechInterface::getActualVelocities(std::vector<double>& velocities_rpm)
+{
+  std::lock_guard<std::mutex> lock(velocities_mutex_);
+  velocities_rpm = actual_velocities_;
 }
 
 bool ZltechInterface::setVelocities(const std::vector<double>& velocities_rpm)
@@ -97,20 +282,51 @@ bool ZltechInterface::setVelocities(const std::vector<double>& velocities_rpm)
   int16_t right_front = static_cast<int16_t>(velocities_rpm[1]);
   int16_t right_rear = static_cast<int16_t>(velocities_rpm[3]);
 
-  // Invert right motors if needed
+//if USE_ZLAC8015D_POLARITY
+  // Current ZLAC8015D setup: invert the right-side motors.
   if (invert_right_motors_) {
     right_front = -right_front;
     right_rear = -right_rear;
   }
+//else
+  // Previous setup (older reference kept here for easy swap):
+  // Invert the left-side driver commands to match the earlier ZLAC8030D behavior.
+  // left_front = -left_front;
+  // left_rear = -left_rear;
+//endif
 
   // Send to driver 1 (left side)
   if (!sendVelocityCommand(driver1_id_, left_front, left_rear)) return false;
-  
+
   // Send to driver 2 (right side)
   if (!sendVelocityCommand(driver2_id_, right_front, right_rear)) return false;
 
   return true;
 }
+
+// Older reference block kept for easy swap back:
+// bool ZltechInterface::setVelocities(const std::vector<double>& velocities_rpm)
+// {
+//   if (velocities_rpm.size() != 4) return false;
+
+//   // FL=0, FR=1, RL=2, RR=3
+//   int16_t left_front = static_cast<int16_t>(velocities_rpm[0]);
+//   int16_t left_rear  = static_cast<int16_t>(velocities_rpm[2]);
+//   int16_t right_front = static_cast<int16_t>(velocities_rpm[1]);
+//   int16_t right_rear  = static_cast<int16_t>(velocities_rpm[3]);
+
+//   // LEFT side needs inversion (driver1/601 goes backward with positive)
+//   left_front = -left_front;
+//   left_rear  = -left_rear;
+
+//   // Driver 1 (601) = LEFT side
+//   if (!sendVelocityCommand(driver1_id_, left_front, left_rear)) return false;
+
+//   // Driver 2 (602) = RIGHT side
+//   if (!sendVelocityCommand(driver2_id_, right_front, right_rear)) return false;
+
+//   return true;
+// }
 
 bool ZltechInterface::readVelocities(std::vector<double>& velocities_rpm)
 {
@@ -151,12 +367,23 @@ bool ZltechInterface::stopMotors()
 }
 
 void ZltechInterface::shutdown()
+// {
+//   if (can_socket_ >= 0) {
+//     stopMotors();
+//     close(can_socket_);
+//     can_socket_ = -1;
+//     std::cout << "Zltech interface shutdown" << std::endl;
+//   }
+// }
+
 {
+  stopReceiveThread();
   if (can_socket_ >= 0) {
     stopMotors();
     close(can_socket_);
     can_socket_ = -1;
-    std::cout << "Zltech interface shutdown" << std::endl;
+    std::cout << C_WARN "[ZLTECH]" C_RESET
+              << " Interface shutdown" << std::endl;
   }
 }
 

@@ -44,8 +44,9 @@ class ParameterValidator:
             ValueError: If validation fails
         """
         try:
-            # Declare parameter with default
-            self.node.declare_parameter(name, default)
+            # Skip if already declared (reconfigure after cascade)
+            if not self.node.has_parameter(name):
+                self.node.declare_parameter(name, default)
             value = self.node.get_parameter(name).value
             
             # Type validation

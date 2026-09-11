@@ -35,7 +35,7 @@
     <!-- Top-level: 5 retries (down from 999)
          5 × (plan + follow + recovery) gives the system ~3-4 minutes
          before ABORT. Mission controller timeout at 120s catches earlier. -->
-    <RecoveryNode number_of_retries="5" name="NavigateRecovery">
+    <RecoveryNode number_of_retries="3" name="NavigateRecovery">
       <Sequence name="NavigateSequence">
         
         <!-- ============================================================
@@ -44,7 +44,7 @@
              If the planner can't find a path in 10 tries with costmap
              clearing, the goal is likely truly unreachable.
              ============================================================ -->
-        <RecoveryNode number_of_retries="10" name="ComputePathRecovery">
+        <RecoveryNode number_of_retries="4" name="ComputePathRecovery">
           <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
           <Sequence name="ClearAndWaitForPath">
             <ClearCostmapExceptRegion name="ClearGlobalExceptNearby" 
@@ -68,7 +68,7 @@
              In a crowd, 15 × 5s = 75s of waiting for people to move.
              If they haven't moved in 75s, they're not going to.
              ============================================================ -->
-        <RecoveryNode number_of_retries="15" name="FollowPathRecovery">
+        <RecoveryNode number_of_retries="6" name="FollowPathRecovery">
           <Sequence name="ValidateAndFollow">
             <!-- Check path validity before committing to follow.
                  If path is now blocked, this fails immediately

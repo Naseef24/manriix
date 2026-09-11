@@ -11,4 +11,11 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(PROGRAMS
+  scripts/jk_bms_node.py
+  scripts/depth_timestamp_fix_node.py
+  scripts/docking_stage_manager.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()

@@ -1,0 +1,39 @@
+# Pause autonomous
+ros2 topic pub --once /teleop/override std_msgs/Bool "data: true"
+
+# Drive forward with teleop to expand the map
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
+# Drive around the area, then Ctrl+C
+
+# Resume autonomous
+ros2 topic pub --once /teleop/override std_msgs/Bool "data: false"
+
+ros2 bag record \
+  /mission/status \
+  /mission/metrics \
+  /mission/recovery_ack \
+  /photo/command \
+  /photo/intelligence/status \
+  /photo/intelligence/trigger \
+  /photo/intelligence/metrics \
+  /teleop/override \
+  /recovery/status \
+  /recovery/command \
+  /recovery/override \
+  /e_stop \
+  /move_base_simple/goal \
+  /navigate_to_pose/_action/status \
+  /navigate_to_pose/_action/feedback \
+  /cmd_vel \
+  /cmd_vel_recovery \
+  /cmd_vel_smoothed \
+  /odometry/filtered \
+  /human_clustering/humans \
+  /human_clustering/clusters \
+  /poi_manager/all_pois \
+  /poi_manager/optimal_positions \
+  /scan \
+  /tf \
+  /map \
+  /zed_system/status \
+  -o ~/Naseef/Mechatronics/manriix2_ws/manriix_bags/mission_$(date +%Y%m%d_%H%M%S)

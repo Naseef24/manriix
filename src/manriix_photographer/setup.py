@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'ros2_vision_bridge = manriix_photographer.ros2_vision_bridge:main',
+            'zed_mqtt_tracking_bridge = manriix_photographer.zed_mqtt_tracking_bridge:main',
             'ai_photographer_bridge.py = manriix_photographer.ai_photographer_bridge:main',
         ],
     },

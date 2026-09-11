@@ -1,0 +1,15 @@
+# =============================================================================
+# Manriix sudoers snippet
+# =============================================================================
+# Allows the Manriix user to bring up CAN interfaces WITHOUT a password prompt.
+# This is required for both manual script use and the systemd service.
+#
+# HOW TO INSTALL:
+#   sudo visudo -f /etc/sudoers.d/manriix-can
+#   (paste the line below, replacing 'your_username' with your actual username)
+#
+# OR run this one-liner:
+#   echo "$(whoami) ALL=(ALL) NOPASSWD: /sbin/ip link set can2 *, /sbin/ip link set can3 *" | sudo tee /etc/sudoers.d/manriix-can
+# =============================================================================
+
+your_username ALL=(ALL) NOPASSWD: /sbin/ip link set can2 *, /sbin/ip link set can3 *

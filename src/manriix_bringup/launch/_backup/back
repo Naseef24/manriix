@@ -1,0 +1,427 @@
+
+
+# #!/usr/bin/env python3
+
+# # Copyright (c) 2024-2026 Hype Insight / Manriix Robotics
+# # Licensed under MIT License
+# """
+# Manriix Robot Bringup - Navigation (Direct ZED SDK)
+
+# Launches full robot with 3× ZED X cameras using Direct SDK (no ZED wrapper).
+# - All cameras managed by single direct_zed_detection_node
+# - Point clouds published for STVL (Nav2 3D obstacle avoidance)
+# - IMU published for EKF sensor fusion (front camera only)
+# - Optional YOLO detection (mode=full)
+
+# Modes:
+#   nav:  Point clouds + IMU only (lightweight, for navigation)
+#   full: Point clouds + IMU + YOLO detection + images (for photography)
+
+# Usage:
+#    # Minimal bringup (core hardware only)
+#    ros2 launch manriix_bringup robot_nav.launch.py hardware_mode:=real \
+#        launch_cameras:=false launch_2dlidar:=false
+
+#    # Full navigation stack
+#    ros2 launch manriix_bringup robot_nav.launch.py hardware_mode:=real
+
+#    # Photography mode with YOLO detection
+#    ros2 launch manriix_bringup robot_nav.launch.py hardware_mode:=real \
+#        camera_mode:=full
+
+#  Launch Order (TimerAction delays):
+#    0.0s  - robot_state_publisher, controller_manager, rplidar
+#    2.0s  - joint_state_broadcaster
+#    3.0s  - manriix_4ws_controller
+#    5.0s  - motor_diagnostics (real hardware only), ZED X cameras
+#   10.0s  - ZMQ bridge (requires cameras)
+# """
+
+# import os
+
+# from ament_index_python.packages import get_package_share_directory
+# from launch import LaunchDescription
+# from launch.actions import (
+#     DeclareLaunchArgument,
+#     GroupAction,
+#     IncludeLaunchDescription,
+#     LogInfo,
+#     SetEnvironmentVariable,
+#     TimerAction,
+# )
+# from launch.conditions import IfCondition
+# from launch.launch_description_sources import PythonLaunchDescriptionSource
+# from launch.substitutions import Command, LaunchConfiguration, PythonExpression
+# from launch_ros.actions import Node
+# from launch_ros.parameter_descriptions import ParameterValue
+
+
+# def generate_launch_description():
+#     # ---------------------------------------------------------------------------
+#     # Package directories
+#     # ---------------------------------------------------------------------------
+#     pkg_bringup = get_package_share_directory('manriix_bringup')
+#     pkg_control = get_package_share_directory('manriix_control')
+#     pkg_description = get_package_share_directory('manriix_description')
+#     pkg_hardware = get_package_share_directory('manriix_hardware')
+#     pkg_rplidar = get_package_share_directory('rplidar_ros')
+
+#     # ---------------------------------------------------------------------------
+#     # Launch arguments
+#     # ---------------------------------------------------------------------------
+#     declare_hardware_mode_cmd = DeclareLaunchArgument(
+#         'hardware_mode',
+#         default_value='mock',
+#         description='Hardware mode: mock, gazebo, ignition, real',
+#         choices=['mock', 'gazebo', 'ignition', 'real'],
+#     )
+
+#     declare_use_sim_time_cmd = DeclareLaunchArgument(
+#         'use_sim_time',
+#         default_value='false',
+#         description='Use simulation time',
+#     )
+
+#     declare_launch_2dlidar_cmd = DeclareLaunchArgument(
+#         'launch_2dlidar',
+#         default_value='true',
+#         description='Launch RPLidar A2M12 2D laser scanner',
+#     )
+
+#     declare_launch_cameras_cmd = DeclareLaunchArgument(
+#         'launch_cameras',
+#         default_value='true',
+#         description='Launch ZED X cameras (3×) via Direct SDK',
+#     )
+
+#     declare_launch_teleop_cmd = DeclareLaunchArgument(
+#         'launch_teleop',
+#         default_value='true',
+#         description='Launch joystick / keyboard teleop',
+#     )
+
+#     declare_launch_ekf_cmd = DeclareLaunchArgument(
+#         'launch_ekf',
+#         default_value='true',
+#         description='Launch EKF localization (robot_localization)',
+#     )
+
+#     declare_launch_zmq_bridge_cmd = DeclareLaunchArgument(
+#         'launch_zmq_bridge',
+#         default_value='true',
+#         description='Launch ZMQ bridge for AI photo-capture system',
+#     )
+
+#     declare_camera_mode_cmd = DeclareLaunchArgument(
+#         'camera_mode',
+#         default_value='nav',
+#         description='Camera mode: nav (point clouds + IMU) or full (+ YOLO)',
+#         choices=['nav', 'full'],
+#     )
+
+#     declare_camera_resolution_cmd = DeclareLaunchArgument(
+#         'camera_resolution',
+#         default_value='SVGA',
+#         description='Camera resolution: SVGA, HD1080, HD1200',
+#         choices=['SVGA', 'HD1080', 'HD1200'],
+#     )
+
+#     declare_camera_depth_mode_cmd = DeclareLaunchArgument(
+#         'camera_depth_mode',
+#         default_value='NEURAL_LIGHT',
+#         description='Depth mode: NEURAL_LIGHT, NEURAL, NEURAL_PLUS',
+#         choices=['NEURAL_LIGHT', 'NEURAL', 'NEURAL_PLUS'],
+#     )
+
+#     declare_camera_fps_cmd = DeclareLaunchArgument(
+#         'camera_fps',
+#         default_value='15',
+#         description='Camera FPS',
+#     )
+
+#     # ---------------------------------------------------------------------------
+#     # Launch configurations
+#     # ---------------------------------------------------------------------------
+#     hardware_mode = LaunchConfiguration('hardware_mode')
+#     use_sim_time = LaunchConfiguration('use_sim_time')
+#     launch_2dlidar = LaunchConfiguration('launch_2dlidar')
+#     launch_cameras = LaunchConfiguration('launch_cameras')
+#     launch_teleop = LaunchConfiguration('launch_teleop')
+#     launch_ekf = LaunchConfiguration('launch_ekf')
+#     launch_zmq_bridge = LaunchConfiguration('launch_zmq_bridge')
+#     camera_mode = LaunchConfiguration('camera_mode')
+#     camera_resolution = LaunchConfiguration('camera_resolution')
+#     camera_depth_mode = LaunchConfiguration('camera_depth_mode')
+#     camera_fps = LaunchConfiguration('camera_fps')
+
+#     # ---------------------------------------------------------------------------
+#     # Derived paths & parameters
+#     # ---------------------------------------------------------------------------
+#     robot_description_content = Command([
+#         'xacro ',
+#         os.path.join(pkg_description, 'urdf', 'manriix2.urdf.xacro'),
+#         ' hardware_mode:=', hardware_mode,
+#     ])
+
+#     controller_config = os.path.join(
+#         pkg_hardware, 'config', 'manriix_controllers.yaml'
+#     )
+
+#     ekf_config = os.path.join(pkg_control, 'config', 'ekf.yaml')
+    
+#     # ---------------------------------------------------------------------------
+#     # Nodes: Core (t=0s)
+#     # ---------------------------------------------------------------------------
+#     start_robot_state_publisher_cmd = Node(
+#         package='robot_state_publisher',
+#         executable='robot_state_publisher',
+#         name='robot_state_publisher',
+#         output='screen',
+#         parameters=[{
+#             'robot_description': ParameterValue(
+#                 robot_description_content, value_type=str
+#             ),
+#             'use_sim_time': use_sim_time,
+#         }],
+#     )
+
+#     start_controller_manager_cmd = Node(
+#         package='controller_manager',
+#         executable='ros2_control_node',
+#         name='controller_manager',
+#         output='screen',
+#         parameters=[
+#             {
+#                 'robot_description': ParameterValue(
+#                     robot_description_content, value_type=str
+#                 ),
+#             },
+#             controller_config,
+#         ],
+#     )
+
+#     # ---------------------------------------------------------------------------
+#     # Nodes: Controller spawners (t=2s, t=3s)
+#     # ---------------------------------------------------------------------------
+#     start_joint_state_broadcaster_cmd = TimerAction(
+#         period=2.0,
+#         actions=[
+#             Node(
+#                 package='controller_manager',
+#                 executable='spawner',
+#                 name='joint_state_broadcaster_spawner',
+#                 arguments=['joint_state_broadcaster'],
+#                 output='screen',
+#             ),
+#         ],
+#     )
+
+#     start_controller_cmd = TimerAction(
+#         period=3.0,
+#         actions=[
+#             Node(
+#                 package='controller_manager',
+#                 executable='spawner',
+#                 name='controller_spawner',
+#                 arguments=[
+#                     'manriix_4ws_controller',
+#                     '--controller-manager', '/controller_manager',
+#                 ],
+#                 output='screen',
+#             ),
+#         ],
+#     )
+
+#     # ---------------------------------------------------------------------------
+#     # Nodes: Motor diagnostics - real hardware only (t=5s)
+#     # ---------------------------------------------------------------------------
+#     start_motor_diagnostics_cmd = TimerAction(
+#         period=5.0,
+#         actions=[
+#             Node(
+#                 package='manriix_hardware',
+#                 executable='motor_diagnostics_node.py',
+#                 name='motor_diagnostics',
+#                 output='screen',
+#                 condition=IfCondition(
+#                     PythonExpression(["'", hardware_mode, "' == 'real'"])
+#                 ),
+#             ),
+#         ],
+#     )
+
+#     # ---------------------------------------------------------------------------
+#     # Sensors: RPLidar A2M12 (t=0s)
+#     # ---------------------------------------------------------------------------
+#     start_rplidar_cmd = IncludeLaunchDescription(
+#         PythonLaunchDescriptionSource(
+#             os.path.join(pkg_rplidar, 'launch', 'rplidar_a2m12_launch.py')
+#         ),
+#         condition=IfCondition(launch_2dlidar),
+#     )
+
+#     # ---------------------------------------------------------------------------
+#     # Sensors: ZED X cameras × 3 - Direct SDK (t=5s)
+#     # ---------------------------------------------------------------------------
+#     start_cameras_cmd = TimerAction(
+#         period=5.0,
+#         actions=[
+#             GroupAction(
+#                 condition=IfCondition(launch_cameras),
+#                 actions=[
+#                     LogInfo(msg=[
+#                         '\n', '=' * 60, '\n',
+#                         '[ZED X] Launching 3 cameras via Direct SDK\n',
+#                         '  Mode: ', camera_mode, '\n',
+#                         '  Resolution: ', camera_resolution, '\n',
+#                         '  Depth: ', camera_depth_mode, '\n',
+#                         '  FPS: ', camera_fps, '\n',
+#                         '  Topics:\n',
+#                         '    /zedx_front/zed_node/point_cloud/cloud_registered\n',
+#                         '    /zedx_left/zed_node/point_cloud/cloud_registered\n',
+#                         '    /zedx_right/zed_node/point_cloud/cloud_registered\n',
+#                         '    /zedx_front/zed_node/imu/data\n',
+#                         '=' * 60,
+#                     ]),
+#                     Node(
+#                         package='manriix_perception',
+#                         executable='direct_zed_detection_node.py',
+#                         name='direct_zed_detection_node',
+#                         output='screen',
+#                         parameters=[{
+#                             'mode': camera_mode,
+#                             'camera_front_serial': 41911351,
+#                             'camera_left_serial': 40487925,
+#                             'camera_right_serial': 46311875,
+#                             'resolution': camera_resolution,
+#                             'depth_mode': camera_depth_mode,
+#                             'fps': camera_fps,
+#                             'front_resolution': '',
+#                             'front_depth_mode': '',
+#                             'publish_rate': 15.0,
+#                             'pointcloud_downsample': 4,
+#                             'confidence_threshold': 50,
+#                             'detection_model': 'YOLO11',
+#                             'yolo_model_path':
+#                                 '/home/hype/models/yolo11/yolo11s.onnx',
+#                             'publish_images': True,
+#                             'draw_bounding_boxes': True,
+#                             'image_scale': 0.5,
+#                             'jpeg_quality': 75,
+#                             'use_sim_time': use_sim_time,
+#                         }],
+#                         respawn=True,
+#                         respawn_delay=5.0,
+#                     ),
+#                 ],
+#             ),
+#         ],
+#     )
+
+#     # ---------------------------------------------------------------------------
+#     # Bridge: ZMQ image bridge for AI photo-capture (t=10s)
+#     # ---------------------------------------------------------------------------
+#     start_zmq_bridge_cmd = TimerAction(
+#         period=10.0,
+#         actions=[
+#             GroupAction(
+#                 condition=IfCondition(
+#                     PythonExpression([
+#                         "'", launch_cameras, "' == 'true' and '",
+#                         launch_zmq_bridge, "' == 'true'",
+#                     ])
+#                 ),
+#                 actions=[
+#                     LogInfo(msg=(
+#                         '[ZMQ Bridge] Starting camera image bridge '
+#                         'to IPC (RGB + Depth + CameraInfo)'
+#                     )),
+#                     Node(
+#                         package='manriix_perception',
+#                         executable='zed_zmq_bridge_node.py',
+#                         name='zed_zmq_bridge',
+#                         output='screen',
+#                         parameters=[{
+#                             'ipc_path': '/tmp/zedx_images.ipc',
+#                             'cameras': ['front', 'left', 'right'],
+#                             'queue_size': 1,
+#                             'publish_stats': True,
+#                             'stats_interval': 10.0,
+#                             'sync_timeout': 0.05,
+#                             'buffer_size': 10,
+#                             'use_sim_time': use_sim_time,
+#                         }],
+#                         respawn=True,
+#                         respawn_delay=5.0,
+#                     ),
+#                 ],
+#             ),
+#         ],
+#     )
+
+#     # ---------------------------------------------------------------------------
+#     # Teleop (optional)
+#     # ---------------------------------------------------------------------------
+#     start_teleop_cmd = IncludeLaunchDescription(
+#         PythonLaunchDescriptionSource(
+#             os.path.join(pkg_control, 'launch', 'teleop.launch.py')
+#         ),
+#         condition=IfCondition(launch_teleop),
+#     )
+
+#     # ---------------------------------------------------------------------------
+#     # EKF localization (optional)
+#     # ---------------------------------------------------------------------------
+#     start_ekf_cmd = Node(
+#         package='robot_localization',
+#         executable='ekf_node',
+#         name='ekf_filter_node',
+#         output='screen',
+#         parameters=[ekf_config, {'use_sim_time': use_sim_time}],
+#         condition=IfCondition(launch_ekf),
+#     )
+
+
+#     # ---------------------------------------------------------------------------
+#     # Compose LaunchDescription
+#     # ---------------------------------------------------------------------------
+#     ld = LaunchDescription()
+
+#     # Environment
+#     ld.add_action(SetEnvironmentVariable('DISPLAY', ':0'))
+#     ld.add_action(SetEnvironmentVariable('RCUTILS_COLORIZED_OUTPUT', '1'))
+#     ld.add_action(SetEnvironmentVariable(
+#         'RCUTILS_CONSOLE_OUTPUT_FORMAT',
+#         '[{severity}] [{name}]: {message}',
+#     ))
+
+#     # Declare arguments
+#     ld.add_action(declare_hardware_mode_cmd)
+#     ld.add_action(declare_use_sim_time_cmd)
+#     ld.add_action(declare_launch_2dlidar_cmd)
+#     ld.add_action(declare_launch_cameras_cmd)
+#     ld.add_action(declare_launch_teleop_cmd)
+#     ld.add_action(declare_launch_ekf_cmd)
+#     ld.add_action(declare_launch_zmq_bridge_cmd)
+#     ld.add_action(declare_camera_mode_cmd)
+#     ld.add_action(declare_camera_resolution_cmd)
+#     ld.add_action(declare_camera_depth_mode_cmd)
+#     ld.add_action(declare_camera_fps_cmd)
+
+#     # Core hardware
+#     ld.add_action(start_robot_state_publisher_cmd)
+#     ld.add_action(start_controller_manager_cmd)
+#     ld.add_action(start_joint_state_broadcaster_cmd)
+#     ld.add_action(start_controller_cmd)
+#     ld.add_action(start_motor_diagnostics_cmd)
+
+#     # Sensors
+#     ld.add_action(start_rplidar_cmd)
+#     ld.add_action(start_cameras_cmd)
+#     ld.add_action(start_zmq_bridge_cmd)
+
+#     # Navigation support
+#     ld.add_action(start_teleop_cmd)
+#     ld.add_action(start_ekf_cmd)
+
+#     return ld

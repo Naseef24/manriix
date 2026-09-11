@@ -1,0 +1,57 @@
+/**:
+  ros__parameters:
+    # ── Output topics ──
+    overlay_topic: '/oak_obstacles/image_overlay/compressed'
+    detections_topic: '/oak_obstacles/detections'
+    mask_topic: '/oak_obstacles/obstacle_mask'
+    plane_topic: '/oak_obstacles/floor_plane'
+
+    # ── TF frame ──
+    camera_frame: 'oak_d_pro_w_rgb_camera_optical_frame'
+
+    # ── OAK pipeline ──
+    image_width: 640
+    image_height: 400
+    camera_fps: 5 #15
+
+    # ── Floor / obstacle ──
+    floor_thresh_m: 0.03
+    ransac_interval_frames: 5
+    ransac_iterations: 60
+
+    # ── Edge processing ──
+    edge_threshold: 60
+    min_obstacle_area: 300
+    speckle_min_area: 80
+
+    # Range — only consider obstacles within this distance (meters)
+    min_obstacle_range_m: 0.3
+    max_obstacle_range_m: 4.0     # ignore anything farther than 4m
+
+    # Size sanity — discard absurd blobs
+    min_obstacle_size_m: 0.03     # smaller than 3 cm = noise
+    max_obstacle_size_m: 1.5      # larger than 1.5m = wall mass, not an object
+
+    # ── Temporal stability ──
+    temporal_window: 7
+    temporal_k: 4
+
+    # ── Morphological kernels ──
+    dilate_kernel: 3
+    close_kernel: 7
+
+    # ── Output options ──
+    publish_overlay: true
+    publish_mask: false        # heavy bandwidth — only when debugging
+    publish_detections: true
+    publish_plane: true
+    publish_pointcloud: true   # primary feed to Nav2 costmap
+
+    # Point cloud density: every Nth pixel is included
+    # 3 = ~85k points (very dense, can be heavy)
+    # 5 = ~10k points (good balance)
+    # 8 = ~4k points (sparse, lighter CPU/network)
+    cloud_subsample: 8
+
+    # ── Logging ──
+    log_profile: false         # set true for per-frame timing in console

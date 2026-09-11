@@ -1,279 +1,242 @@
 # Photographer System Parameters
-# ROS2 YAML parameter file for complete photographer robot system
-# Use with: ros2 launch photographer_system.launch.py --ros-args --params-file config/photographer_system_params.yaml
+# ROS2 YAML parameter file — loaded by complete_photography_robot.launch.py
+#
+# Parameter alignment verified against ros2 param list output.
+# Only params declared by each node are included — undeclared entries
+# are silently ignored by ROS2 and serve no purpose.
+#
+# /** wildcard removed: log_level is not a ROS2 parameter (use --ros-args
+# --log-level instead). enable_debug_mode was not declared by any node.
 
-/**:
-  ros__parameters:
-    # Global system settings
-    log_level: "INFO"
-    enable_debug_mode: false
-
-# POI Manager parameters  
+# ── POI Manager ───────────────────────────────────────────────────────────────
+# Verified declared params: 11 entries below match ros2 param list exactly.
+# REMOVED (not declared by node): logging.*, formation_aware_positioning,
+#                                 aesthetic_scoring
+# ADDED   (declared, were missing): accessibility_weight, formation_weight,
+#                                   poi_update_rate, position_stability_time
 poi_manager:
   ros__parameters:
-    # Enhanced Logging settings
-    logging:
-      level: "INFO"
-      colors: true              # Force enable colors
-      emojis: true
-      structured: true
-      force_colors: true        # Override terminal detection
-      
-    personal_space_radius: 1.2
-    social_space_radius: 2.5
-    photo_distance_min: 2.0
-    photo_distance_max: 8.0
-    photo_distance_optimal: 3.5
-    formation_aware_positioning: true
-    aesthetic_scoring: true
-    rule_of_thirds_weight: 0.4
-    symmetry_weight: 0.3
+    config_path: "/home/hype/manriix2_ws/install/manriix_perception/share/manriix_perception/config/clustering_params.yaml"
+    personal_space_radius:    1.2
+    social_space_radius:      2.5
+    photo_distance_min:       2.0
+    photo_distance_max:       8.0
+    photo_distance_optimal:   3.5
+    rule_of_thirds_weight:    0.4
+    symmetry_weight:          0.3
+    accessibility_weight:     0.25   # node default
+    formation_weight:         0.25   # node default
+    poi_update_rate:          2.0    # node default (Hz)
+    position_stability_time:  3.0   # node default (seconds)
 
-# Photo Intelligence System parameters
+# ── Photo Intelligence System ─────────────────────────────────────────────────
+# 24/24 params verified — no changes needed.
 photo_intelligence_system:
   ros__parameters:
-    # Basic timing (validated ranges)
-    min_duration: 10.0              # 10.0-300.0 range
-    max_duration: 10.0             # 10.0-300.0 range  
-    base_duration: 5.0             # Between min/max
-    evaluation_time: 2.0            # 0.5-10.0 range
-    cooldown_time: 2.0             # 1.0-60.0 range
-    stability_threshold: 2.0        # 0.5-10.0 range
-    
-    # Group size timing (validated ranges)
-    single_person_duration: 35.0    # 15.0-120.0 range
-    small_group_duration: 50.0      # 20.0-120.0 range
-    medium_group_duration: 70.0     # 30.0-120.0 range
-    large_group_duration: 90.0      # 40.0-120.0 range
-    
-    # Formation bonuses (validated ranges)
-    circle_formation_bonus: 10.0    # 0.0-30.0 range
-    line_formation_bonus: 15.0      # 0.0-30.0 range
-    formal_pose_bonus: 20.0        # 0.0-40.0 range
-    
-    # Stability adjustments (validated ranges)
-    stable_group_reduction: 10.0    # 0.0-30.0 range
-    unstable_group_addition: 15.0   # 0.0-30.0 range
-    high_movement_reduction: 15.0   # 0.0-30.0 range
-    low_movement_addition: 10.0     # 0.0-20.0 range
-    
-    # Quality adjustments (validated ranges)
-    high_attention_bonus: 10.0      # 0.0-20.0 range
-    low_attention_reduction: 10.0   # 0.0-20.0 range
-    high_density_addition: 10.0     # 0.0-20.0 range
-    
-    # Multi-shot settings (validated ranges)
-    enable_multi_shot: false        # Disabled by default
-    multi_shot_threshold: 8         # 2-20 range
-    shot_interval: 5.0              # 1.0-15.0 range
-    max_shots: 3                    # 1-5 range
+    # Timing
+    min_duration:          30.0  #180.0   # 10.0–300.0
+    max_duration:          180.0  # 10.0–300.0
+    base_duration:         120.0  #180.0   # between min/max
+    evaluation_time:         2.0   # 0.5–10.0
+    cooldown_time:           2.0   # 1.0–60.0
+    stability_threshold:     2.0   # 0.5–10.0
 
-# Mission Controller parameters
+    # Group size durations
+    single_person_duration:  35.0   # 15.0–120.0
+    small_group_duration:    50.0   # 20.0–120.0
+    medium_group_duration:   70.0   # 30.0–120.0
+    large_group_duration:    90.0   # 40.0–120.0
+
+    # Formation bonuses
+    circle_formation_bonus:  10.0   # 0.0–30.0
+    line_formation_bonus:    15.0   # 0.0–30.0
+    formal_pose_bonus:       20.0   # 0.0–40.0
+
+    # Stability adjustments
+    stable_group_reduction:    10.0   # 0.0–30.0
+    unstable_group_addition:   15.0   # 0.0–30.0
+    high_movement_reduction:   15.0   # 0.0–30.0
+    low_movement_addition:     10.0   # 0.0–20.0
+
+    # Quality adjustments
+    high_attention_bonus:      10.0   # 0.0–20.0
+    low_attention_reduction:   10.0   # 0.0–20.0
+    high_density_addition:     10.0   # 0.0–20.0
+
+    # Multi-shot
+    enable_multi_shot:      false
+    multi_shot_threshold:   8       # 2–20
+    shot_interval:          5.0     # 1.0–15.0
+    max_shots:              3       # 1–5
+
+# ── Mission Controller ────────────────────────────────────────────────────────
+# 15/15 params verified — no changes needed.
+# enable_autonomous_navigation is injected by launch file, not set here.
 mission_controller:
   ros__parameters:
-    # Core mission timing (validated ranges)
-    evaluation_time: 2.0            # 0.5-10.0 range
-    stability_wait_time: 3.0        # 1.0-10.0 range
-    arrival_threshold: 1.0          # 0.1-5.0 range
-    
-    # Advanced mission parameters (validated ranges)
-    transition_speed_factor: 0.7    # 0.1-1.0 range
-    target_switch_threshold: 0.15   # 0.05-0.5 range
-    max_evaluation_time: 10.0       # 5.0-30.0 range
-    stability_threshold: 0.05       # 0.01-0.2 range
-    replanning_interval: 5.0        # 1.0-15.0 range
+    evaluation_time:              2.0    # 0.5–10.0
+    stability_wait_time:          3.0    # 1.0–10.0
+    arrival_threshold:            1.0    # 0.1–5.0
+    transition_speed_factor:      0.7    # 0.1–1.0
+    target_switch_threshold:      0.15   # 0.05–0.5
+    max_evaluation_time:         10.0    # 5.0–30.0
+    stability_threshold:          0.05   # 0.01–0.2
+    replanning_interval:          5.0    # 1.0–15.0
+    max_poi_retries:              5
+    per_goal_timeout:            60.0
+    failed_position_radius:       2.0
+    failed_position_memory_time: 300.0
+    progress_check_window:       15.0
+    progress_min_distance:        0.5
+    absolute_nav_timeout:       180.0
 
-# Recovery Manager parameters - Tuned for multi-camera fusion system
+# ── Recovery Manager ──────────────────────────────────────────────────────────
+# REMOVED (node no longer declares): escalation_timeout, enable_emergency_stop
+# ADDED   (declared, were missing):  command_ack_timeout, safe_parking_position,
+#                                    system_health_check_interval
+# enable_autonomous_navigation is injected by launch file, not set here.
 recovery_manager:
   ros__parameters:
-    # Timeouts extended to handle multi-camera sync delays and sensor init
-    no_data_timeout: 45.0           # Extended from 30.0 - allows sensor initialization
-    stale_data_timeout: 15.0        # Extended from 5.0 - handles normal fusion sync delays
-    max_recovery_attempts: 3        # Maximum recovery attempts per level
-    escalation_timeout: 90.0        # Extended from 30.0 - allows recovery actions to complete
-    enable_emergency_stop: true     # Enable emergency stop capability
+    no_data_timeout:               90.0 #45.0          # extended: allows sensor init
+    stale_data_timeout:            15.0          # extended: handles fusion sync
+    max_recovery_attempts:          3
+    command_ack_timeout:           10.0          # node default
+    system_health_check_interval:   5.0          # node default (Hz)
+    safe_parking_position:         [0.0, 0.0]   # node default (x, y metres)
 
-# Human Clustering Node parameters (if using clustering_params.yaml is not preferred)
+# ── Human Clustering Node ─────────────────────────────────────────────────────
+# Node declares ONLY: config_path, use_sim_time
+# All nested visualization/debug/monitoring entries in the old YAML were dead.
+# The node reads its operational config from the file at config_path.
+# Point this to the installed clustering config for your workspace.
+# If config_path is empty the node uses internal hardcoded defaults.
 human_clustering_node:
   ros__parameters:
-    # Local visualization (matplotlib only, web interface uses /web/* topics)
-    visualization:
-      enabled: false                # Toggle local matplotlib visualization
+    config_path: "/home/hype/manriix2_ws/install/manriix_perception/share/manriix_perception/config/clustering_params.yaml"
 
-    # Debug settings (disabled for production)
-    debug:
-      print_transforms: false
-      print_positions: false
-      print_clusters: false
-      
-    # Performance settings
-    monitoring:
-      enabled: true
-      publish_rate: 1.0
-      enable_jetson_monitoring: true
-      enable_profiling: false
-
-# Object Costmap Bridge parameters
+# ── Object Costmap Bridge ─────────────────────────────────────────────────────
+# Not launched by complete_photography_robot.launch.py.
+# Kept here for when this node is added to the launch file.
 object_costmap_bridge:
   ros__parameters:
-    # Input/output topics
-    objects_topic: '/zed_system/fused_detections'
-    output_topic: '/object_obstacles'
-    output_frame_id: 'base_footprint'  # Nav2 standard frame at ground level
-    
-    # Filtering parameters
-    min_confidence: 50.0
-    max_range: 8.0
-    min_range: 0.3
-    
-    # Visualization (disabled for production)
-    publish_markers: false
-    
-    # Object detection settings
-    detect_persons: true
-    detect_vehicles: true  
-    detect_animals: true
-    detect_bags: false
+    objects_topic:    "/zed_system/fused_detections"
+    output_topic:     "/object_obstacles"
+    output_frame_id:  "base_footprint"
+    min_confidence:   50.0
+    max_range:         8.0
+    min_range:         0.3
+    publish_markers:  false
+    detect_persons:   true
+    detect_vehicles:  true
+    detect_animals:   true
+    detect_bags:      false
     detect_electronics: false
-    detect_sport: false
-    
-    # Class-specific radii
-    person_radius: 0.4
-    vehicle_radius: 0.5
-    animal_radius: 0.3
-    bag_radius: 0.2
-    default_radius: 0.3
+    detect_sport:     false
+    person_radius:    0.4
+    vehicle_radius:   0.5
+    animal_radius:    0.3
+    bag_radius:       0.2
+    default_radius:   0.3
 
-# ZED Fusion Node parameters (migrated from unified_perception_config.yaml)
+# ── ZED Fusion Node ───────────────────────────────────────────────────────────
+# Not launched by complete_photography_robot.launch.py.
+# Kept here for when this node is added to the launch file.
+# Serial numbers and positions must match URDF manriix2.urdf.xacro.
 zed_fusion_node:
   ros__parameters:
-    # Enhanced Logging settings
-    logging:
-      level: "INFO"
-      enable_performance_logs: true
-      log_detection_stats: true
-      colors: true              # Force enable colors
-      emojis: true             # Enable emoji indicators
-      structured: true         # Enable structured logging with context fields
-      force_colors: true        # Override terminal detection
-
-    # Camera configurations (values match URDF manriix2.urdf.xacro)
     cameras:
       zedx_front:
-        enabled: true
-        serial_number: 41911351  # Camera serial number for direct SDK
-        topic: "/zedx_front/zed_node/obj_det/objects"  # Used by ROS_WRAPPER mode
-        frame_id: "zedx_front_left_camera_frame"
-        position: [ 0.145, 0.0, 0.815 ]  # From URDF: xyz="0.145 0.0 0.815"
-        orientation: [ 0.0, 0.0, 0.0, 1.0 ]  # 0° yaw (forward facing)
-        yaw_radians: 0.0  # For direct SDK coordinate transform
+        enabled:              true
+        serial_number:        41911351
+        topic:                "/zedx_front/zed_node/obj_det/objects"
+        frame_id:             "zedx_front_left_camera_frame"
+        position:             [0.145, 0.0, 0.815]
+        orientation:          [0.0, 0.0, 0.0, 1.0]
+        yaw_radians:          0.0
         confidence_threshold: 60.0
-        detection_classes: [ "PERSON", "VEHICLE", "ANIMAL" ]
-
+        detection_classes:    ["PERSON", "VEHICLE", "ANIMAL"]
       zedx_left:
-        enabled: true
-        serial_number: 40487925  # Camera serial number for direct SDK
-        topic: "/zedx_left/zed_node/obj_det/objects"  # Used by ROS_WRAPPER mode
-        frame_id: "zedx_left_left_camera_frame"
-        position: [ 0.0, 0.175, 0.815 ]  # From URDF: xyz="0.0 0.175 0.815"
-        orientation: [ 0.0, 0.0, 0.8660254, 0.5 ]  # 120° yaw from URDF: rpy="0 0 2.094"
-        yaw_radians: 2.094  # For direct SDK coordinate transform
+        enabled:              true
+        serial_number:        40487925
+        topic:                "/zedx_left/zed_node/obj_det/objects"
+        frame_id:             "zedx_left_left_camera_frame"
+        position:             [0.0, 0.175, 0.815]
+        orientation:          [0.0, 0.0, 0.8660254, 0.5]
+        yaw_radians:          2.094
         confidence_threshold: 60.0
-        detection_classes: [ "PERSON", "VEHICLE", "ANIMAL" ]
-
+        detection_classes:    ["PERSON", "VEHICLE", "ANIMAL"]
       zedx_right:
-        enabled: true
-        serial_number: 46311875
-        topic: "/zedx_right/zed_node/obj_det/objects"  # Used by ROS_WRAPPER mode
-        frame_id: "zedx_right_left_camera_frame"
-        position: [ 0.0, -0.175, 0.815 ]  # From URDF: xyz="0.0 -0.175 0.815"
-        orientation: [ 0.0, 0.0, -0.8660254, 0.5 ]  # -120° yaw from URDF: rpy="0 0 -2.094"
-        yaw_radians: -2.094  # For direct SDK coordinate transform
+        enabled:              true
+        serial_number:        46311875
+        topic:                "/zedx_right/zed_node/obj_det/objects"
+        frame_id:             "zedx_right_left_camera_frame"
+        position:             [0.0, -0.175, 0.815]
+        orientation:          [0.0, 0.0, -0.8660254, 0.5]
+        yaw_radians:          -2.094
         confidence_threshold: 60.0
-        detection_classes: [ "PERSON", "VEHICLE", "ANIMAL" ]
-    
-    # Detection settings
+        detection_classes:    ["PERSON", "VEHICLE", "ANIMAL"]
     detection:
-      enable_tracking: true
-      tracking_timeout: 2.0  # seconds
-      min_detection_confidence: 50.0
-      max_detection_range: 10.0  # meters
+      enable_tracking:            true
+      tracking_timeout:           2.0
+      min_detection_confidence:   50.0
+      max_detection_range:        10.0
       enable_velocity_estimation: true
-      velocity_smoothing_window: 5
-      
-      # Class-specific settings
+      velocity_smoothing_window:  5
       person_detection:
-        min_confidence: 60.0
-        max_range: 8.0
+        min_confidence:        60.0
+        max_range:              8.0
         enable_pose_estimation: false
-        
       vehicle_detection:
         min_confidence: 70.0
-        max_range: 15.0
-        
+        max_range:      15.0
       animal_detection:
         min_confidence: 65.0
-        max_range: 6.0
-    
-    # Multi-camera fusion settings
+        max_range:       6.0
     fusion:
       synchronization:
-        max_time_diff: 0.1  # Maximum time difference for frame sync (seconds)
-        min_cameras_required: 1  # Minimum cameras needed for fusion
-        sync_timeout: 0.5  # Timeout for waiting for synchronized frames
-      
+        max_time_diff:         0.1
+        min_cameras_required:  1
+        sync_timeout:          0.5
       spatial_fusion:
-        duplicate_threshold: 0.8  # Distance threshold for duplicate detection (meters)
-        confidence_fusion_method: "weighted_average"  # Options: max, average, weighted_average
-        position_fusion_method: "weighted_centroid"   # Options: centroid, weighted_centroid
-        enable_cross_camera_tracking: true
-        tracking_association_threshold: 1.0  # meters
-      
+        duplicate_threshold:            0.8
+        confidence_fusion_method:       "weighted_average"
+        position_fusion_method:         "weighted_centroid"
+        enable_cross_camera_tracking:   true
+        tracking_association_threshold: 1.0
       temporal_smoothing:
-        enable_smoothing: true
-        position_smoothing_factor: 0.3  # 0.0 = no smoothing, 1.0 = maximum smoothing
-        velocity_smoothing_factor: 0.5
+        enable_smoothing:           true
+        position_smoothing_factor:  0.3
+        velocity_smoothing_factor:  0.5
         confidence_smoothing_factor: 0.2
-    
-    # Coordinate transformation settings
     transform:
-      target_frame: "base_footprint"  # Nav2 standard frame at ground level (z=0)
-      enable_tf_lookup: true
-      tf_timeout: 1.0  # seconds
-
-      # Static transforms for cameras (if TF not available) - values match URDF
+      target_frame:       "base_footprint"
+      enable_tf_lookup:   true
+      tf_timeout:         1.0
       use_static_transforms: false
       static_transforms:
         zedx_front:
           translation: [0.145, 0.0, 0.815]
-          rotation: [0.0, 0.0, 0.0, 1.0]  # 0° yaw
+          rotation:    [0.0, 0.0, 0.0, 1.0]
         zedx_left:
           translation: [0.0, 0.175, 0.815]
-          rotation: [0.0, 0.0, 0.8660254, 0.5]  # 120° yaw
+          rotation:    [0.0, 0.0, 0.8660254, 0.5]
         zedx_right:
           translation: [0.0, -0.175, 0.815]
-          rotation: [0.0, 0.0, -0.8660254, 0.5]  # -120° yaw
-
-    # Output settings
+          rotation:    [0.0, 0.0, -0.8660254, 0.5]
     output:
       humans_list:
-        topic: "/human_clustering/humans"  # Output topic for clustering pipeline
-        frame_id: "base_footprint"  # Nav2 standard frame
-        publish_rate: 10.0  # Hz
-        
+        topic:        "/human_clustering/humans"
+        frame_id:     "base_footprint"
+        publish_rate: 10.0
       debug:
-        enabled: false  # Enable debug output topics
-        fused_detections_topic: "/zed_system/fused_detections"
-        raw_detections_topic: "/zed_system/raw_detections"
-        
-    # Diagnostics settings  
+        enabled:                  false
+        fused_detections_topic:   "/zed_system/fused_detections"
+        raw_detections_topic:     "/zed_system/raw_detections"
     diagnostics:
       enable_performance_metrics: true
-      system_status_topic: "/zed_system/status"
-      fusion_diagnostics_topic: "/zed_system/fusion_diagnostics"
-      publish_rate: 1.0  # Hz
-      
-      # Performance thresholds
-      max_processing_time_ms: 50.0  # Alert if processing takes longer
-      min_output_rate_hz: 5.0       # Alert if output rate drops below
-      max_memory_usage_mb: 500.0    # Alert if memory usage exceeds
+      system_status_topic:        "/zed_system/status"
+      fusion_diagnostics_topic:   "/zed_system/fusion_diagnostics"
+      publish_rate:               1.0
+      max_processing_time_ms:     50.0
+      min_output_rate_hz:          5.0
+      max_memory_usage_mb:       500.0

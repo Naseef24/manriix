@@ -1,0 +1,192 @@
+# =============================================================================
+# Manriix Bi3D-Freespace launch — low-obstacle detection via Bi3D DNN on DLA
+#
+# Pipeline:
+#   ZED front color (BGRA8 960x600)
+#     -> ImageFormatConverter (BGRA8 -> RGB8, 960x600 -> 960x576)
+#     -> Bi3DNode (DLA core 0, featnet + segnet)
+#     -> FreespaceSegmentationNode (occupancy grid for Nav2)
+#
+# Runs in its own container (NOT the nvblox_container) for isolated debugging.
+#
+# Requires base_footprint -> zedx_front_left_camera_frame_optical TF to be alive.
+# Launch order:
+#   1. Main stack (robot_nav_nvblox.launch.py)
+#   2. Stereo pipeline (cuvslam_for_nvblox.launch.py)
+#   3. THIS LAUNCH (manriix_bi3d_freespace.launch.py)
+#
+# Engine paths verified via:
+#   /home/hype/manriix2_ws/isaac_ros_assets/models/bi3d_proximity_segmentation/featnet.plan
+#   /home/hype/manriix2_ws/isaac_ros_assets/models/bi3d_proximity_segmentation/segnet.plan
+#
+# Camera intrinsics verified via:
+#   ros2 topic echo /zedx_front/zed_node/left/color/rect/camera_info
+# =============================================================================
+
+import os
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import ComposableNodeContainer
+from launch_ros.descriptions import ComposableNode
+
+
+def generate_launch_description():
+    # ---------- Defaults ----------
+    HOME = os.path.expanduser('~')
+    DEFAULT_MODEL_DIR = os.path.join(
+        HOME, 'manriix2_ws', 'isaac_ros_assets', 'models',
+        'bi3d_proximity_segmentation')
+
+    # Bi3D model input dimensions (HARD-CODED in the model)
+    BI3D_W = 960
+    BI3D_H = 576
+
+    # ZED front intrinsics (verified from /zedx_front/zed_node/left/color/rect/camera_info)
+    # NOTE: f_x and f_y are valid for the ORIGINAL 960x600 ZED output.
+    # After we resize to 960x576, f_y scales by (576/600) = 0.96.
+    # Bi3D's freespace projection uses these for ground-plane geometry.
+    ZED_F_X_NATIVE = 368.5843505859375  # for 960 width (unchanged after resize)
+    ZED_F_Y_NATIVE = 368.5843505859375  # for 600 height (needs scaling)
+    ZED_F_Y_RESIZED = ZED_F_Y_NATIVE * (BI3D_H / 600.0)  # = 353.840...
+
+    # ---------- Launch arguments ----------
+    launch_args = [
+        DeclareLaunchArgument(
+            'featnet_engine_file_path',
+            default_value=os.path.join(DEFAULT_MODEL_DIR, 'featnet.plan'),
+            description='Path to Bi3D Featnet TensorRT engine'),
+        DeclareLaunchArgument(
+            'segnet_engine_file_path',
+            default_value=os.path.join(DEFAULT_MODEL_DIR, 'segnet.plan'),
+            description='Path to Bi3D Segnet TensorRT engine'),
+        DeclareLaunchArgument(
+            'max_disparity_values',
+            default_value='64',
+            description='Maximum number of disparity values for Bi3D inference'),
+        DeclareLaunchArgument(
+            'base_link_frame',
+            default_value='base_footprint',
+            description='Robot base frame (Manriix uses base_footprint, not base_link)'),
+        DeclareLaunchArgument(
+            'camera_frame',
+            default_value='zedx_front_left_camera_frame_optical',
+            description='ZED front-left optical frame'),
+        DeclareLaunchArgument(
+            'grid_height',
+            default_value='2000',
+            description='Occupancy grid height (cells). 2000 * 0.01 = 20m'),
+        DeclareLaunchArgument(
+            'grid_width',
+            default_value='2000',
+            description='Occupancy grid width (cells)'),
+        DeclareLaunchArgument(
+            'grid_resolution',
+            default_value='0.01',
+            description='Cell size (m). 0.01 = 1 cm'),
+    ]
+
+    featnet_engine_file_path = LaunchConfiguration('featnet_engine_file_path')
+    segnet_engine_file_path = LaunchConfiguration('segnet_engine_file_path')
+    max_disparity_values = LaunchConfiguration('max_disparity_values')
+    base_link_frame = LaunchConfiguration('base_link_frame')
+    camera_frame = LaunchConfiguration('camera_frame')
+    grid_height = LaunchConfiguration('grid_height')
+    grid_width = LaunchConfiguration('grid_width')
+    grid_resolution = LaunchConfiguration('grid_resolution')
+
+    # ---------- Image format converters (BGRA8 -> RGB8, 960x600 -> 960x576) ----------
+    # ZED publishes bgra8 at 960x600. Bi3D needs rgb8 at 960x576.
+    # ImageFormatConverterNode handles both color conversion and resize in one step.
+    image_format_converter_left = ComposableNode(
+        package='isaac_ros_image_proc',
+        plugin='nvidia::isaac_ros::image_proc::ImageFormatConverterNode',
+        name='bi3d_image_format_left',
+        parameters=[{
+            'encoding_desired': 'rgb8',
+            'image_width': BI3D_W,
+            'image_height': BI3D_H,
+        }],
+        remappings=[
+            ('image_raw', '/zedx_front/zed_node/left/color/rect/image'),
+            ('image', '/bi3d/left/image_rect_rgb'),
+        ],
+        extra_arguments=[{'use_intra_process_comms': False}],
+    )
+
+    image_format_converter_right = ComposableNode(
+        package='isaac_ros_image_proc',
+        plugin='nvidia::isaac_ros::image_proc::ImageFormatConverterNode',
+        name='bi3d_image_format_right',
+        parameters=[{
+            'encoding_desired': 'rgb8',
+            'image_width': BI3D_W,
+            'image_height': BI3D_H,
+        }],
+        remappings=[
+            ('image_raw', '/zedx_front/zed_node/right/color/rect/image'),
+            ('image', '/bi3d/right/image_rect_rgb'),
+        ],
+        extra_arguments=[{'use_intra_process_comms': False}],
+    )
+
+    # ---------- Bi3D inference node ----------
+    bi3d_node = ComposableNode(
+        package='isaac_ros_bi3d',
+        plugin='nvidia::isaac_ros::bi3d::Bi3DNode',
+        name='bi3d_node',
+        parameters=[{
+            'image_width': BI3D_W,
+            'image_height': BI3D_H,
+            'featnet_engine_file_path': featnet_engine_file_path,
+            'segnet_engine_file_path': segnet_engine_file_path,
+            'max_disparity_values': max_disparity_values,
+        }],
+        remappings=[
+            ('left_image_bi3d',       '/bi3d/left/image_rect_rgb'),
+            ('right_image_bi3d',      '/bi3d/right/image_rect_rgb'),
+            ('left_camera_info_bi3d', '/zedx_front/zed_node/left/color/rect/camera_info'),
+            ('right_camera_info_bi3d','/zedx_front/zed_node/right/color/rect/camera_info'),
+        ],
+        extra_arguments=[{'use_intra_process_comms': False}],
+    )
+
+    # ---------- Freespace segmentation -> occupancy grid for Nav2 ----------
+    # Uses TF lookup (base_footprint -> camera_frame) to project the binary
+    # Bi3D mask onto the ground plane.
+    freespace_segmentation_node = ComposableNode(
+        package='isaac_ros_bi3d_freespace',
+        plugin='nvidia::isaac_ros::bi3d_freespace::FreespaceSegmentationNode',
+        name='freespace_segmentation_node',
+        parameters=[{
+            'base_link_frame': base_link_frame,
+            'camera_frame': camera_frame,
+            'f_x': ZED_F_X_NATIVE,    # unchanged after horizontal resize (960->960)
+            'f_y': ZED_F_Y_RESIZED,   # scaled by 576/600 = 353.84
+            'grid_height': grid_height,
+            'grid_width': grid_width,
+            'grid_resolution': grid_resolution,
+        }],
+        remappings=[
+            ('bi3d_mask', '/bi3d_node/bi3d_output'),
+        ],
+        extra_arguments=[{'use_intra_process_comms': False}],
+    )
+
+    # ---------- Container ----------
+    # Standalone container (NOT loaded into nvblox_container for isolated debugging).
+    bi3d_container = ComposableNodeContainer(
+        name='bi3d_container',
+        namespace='',
+        package='rclcpp_components',
+        executable='component_container_mt',
+        composable_node_descriptions=[
+            image_format_converter_left,
+            image_format_converter_right,
+            bi3d_node,
+            freespace_segmentation_node,
+        ],
+        output='screen',
+    )
+
+    return LaunchDescription(launch_args + [bi3d_container])

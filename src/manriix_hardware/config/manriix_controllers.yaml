@@ -44,11 +44,12 @@ manriix_4ws_controller:
     # track_width: 0.53836
     # wheel_radius: 0.101
     # steering_offset: 0.085
-    wheelbase: 0.44 #0.365
-    track_width: 0.635 #0.75
-    wheel_radius: 0.101
-    steering_offset: 0.085
-
+    wheelbase: 0.540 #0.44 #0.365
+    track_width: 0.650 #0.740 #0.705 #0.735 #0.635 #0.75
+    wheel_radius: 0.101 #0.133 #0.101 #0.133 #0.101
+    steering_offset: 0.085 #0.130 #0.135 #0.120 #0.135 #0.085
+# 130+130+480=740
+# 85+85+480=650
 
     # ═══════════════════════════════════════════════════════════════════════════
     # Velocity limits
@@ -59,7 +60,7 @@ manriix_4ws_controller:
     # max_angular_acceleration: 1.0
 
     max_linear_velocity: 0.8 #1.5 #1.667
-    max_angular_velocity: 1.2 #1.0 #2.0 #3.14
+    max_angular_velocity: 0.8 #1.0 #2.0 #3.14
     max_linear_acceleration: 0.6 #0.5 #1.0
     max_angular_acceleration: 2.0 #0.8 #1.0
     

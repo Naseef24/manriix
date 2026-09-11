@@ -59,93 +59,64 @@ class HumanClusteringNode(Node):
     """Main node"""
     
     def __init__(self):
-        """Initialize the ROS2 node and components"""
         super().__init__('human_clustering_node')
         self.get_logger().info("Starting Human Clustering Node...")
-        
-        # Declare parameters
         self.declare_parameter('config_path', '')
         
-        # Load configuration first - use share directory as default
         config_path = self.get_parameter('config_path').get_parameter_value().string_value
-        
         if not config_path:
-            # Use default path in installed share directory
             from ament_index_python.packages import get_package_share_directory
             try:
                 package_share = get_package_share_directory('manriix_perception')
-                config_path = os.path.join(package_share, 'config', 'clustering_config.yaml')
+                config_path = os.path.join(package_share, 'config', 'clustering_params.yaml')
             except Exception:
-                # Fallback to relative path
-                config_path = 'config/clustering_config.yaml'
-        
+                config_path = 'config/clustering_params.yaml'
+
         self.get_logger().info(f"Loading config from: {config_path}")
         self.config = self.load_config(config_path)
-        
         if not self.config:
             self.get_logger().error("Failed to load config file")
             return
-            
-        # Validate configuration
         if not self.validate_config():
             self.get_logger().error("Configuration validation failed")
             return
-        
-        # Initialize optimization layer first
+
         self.init_optimization_layer()
-        
-        # Initialize memory management
-        self.memory_manager = MemoryManager(max_history=50)  # Reduced for Jetson
+        self.memory_manager = MemoryManager(max_history=50)
         self.parallel_processor = ParallelProcessor(node=self)
-        
-        # Register memory buffers
         self.memory_manager.register_buffer('humans')
         self.memory_manager.register_buffer('clusters')
         self.memory_manager.register_buffer('optimal_positions')
-        
-        # Initialize components
         self.initialize_components()
-        
-        # Initialize publishers and subscribers
         self.initialize_publishers()
-        self.initialize_subscribers()
-        
-        # Initialize state variables with thread safety
-        self.state_lock = threading.RLock()  # Reentrant lock for nested calls
+
+        self.state_lock = threading.RLock()
         self.current_humans = {}
         self.current_clusters = []
         self.optimal_positions = []
         self.robot_position = None
         self.robot_orientation = None
-        
-        # Movement and scanning state
         self.is_moving = False
         self.current_optimal_position = None
         self.position_locked = False
         self.publish_allowed = True
-        
-        # Scanning state variables
         self.is_scanning = False
         self.scan_start_time = None
         self.robot_stopped = False
         self.last_position = None
         self.last_position_time = None
-        
-        # Load target detection configuration
+
         target_config = self.config.get('target_detection', {})
         self.scan_region_radius = target_config.get('scan_region_radius', 1.0)
         self.position_change_threshold = target_config.get('position_change_threshold', 0.05)
         self.position_stable_duration = Duration(seconds=target_config.get('position_stable_duration', 0.5))
         self.scan_duration = Duration(seconds=target_config.get('scan_duration', 120.0))
-        self.enable_position_stability_check = target_config.get('enable_position_stability_check', True) 
-
-        # Orientation checking configuration
+        self.enable_position_stability_check = target_config.get('enable_position_stability_check', True)
         self.check_orientation = target_config.get('check_orientation', False)
         if self.check_orientation:
             self.orientation_tolerance_degrees = target_config.get('orientation_tolerance_degrees', 15.0)
             self.orientation_tolerance_rad = np.radians(self.orientation_tolerance_degrees)
-        
-        # Recovery state management
+
         recovery_config = self.config.get('recovery', {})
         self.recovery_state = "NORMAL"
         self.current_scan_angle_index = 0
@@ -155,34 +126,28 @@ class HumanClusteringNode(Node):
         self.no_data_timeout = Duration(seconds=recovery_config.get('no_data_timeout', 30.0))
         self.orientation_wait_time = Duration(seconds=recovery_config.get('orientation_wait_time', 3.0))
         self.max_recovery_attempts = recovery_config.get('max_recovery_attempts', 3)
-        
-        # Initialize orientation angles for scanning
         num_angles = recovery_config.get('orientation_scan_angles', 6)
         for i in range(num_angles):
-            angle = (2 * np.pi * i) / num_angles
-            self.orientation_angles.append(angle)
-        
-        # Subscriber availability monitoring
+            self.orientation_angles.append((2 * np.pi * i) / num_angles)
+
         self.start_scan_subscriber_available = False
         self.last_subscriber_check = self.get_clock().now()
         self.subscriber_check_interval = Duration(seconds=2.0)
         self.no_subscriber_move_timer = None
         self.no_subscriber_wait_duration = Duration(seconds=5.0)
         self.current_position_index = 0
-        
-        # Performance monitoring for real-time operation
         self.frame_count = 0
         self.process_every_n_frames = self.calculate_frame_skip_rate()
-        self.processing_times = deque(maxlen=50)  # Reduced for memory
+        self.processing_times = deque(maxlen=50)
         self.last_cleanup_time = self.get_clock().now()
         self.performance_monitor = PerformanceMonitor(node=self)
-        
-        # Message validation
         self.last_valid_message_time = self.get_clock().now()
-        self.message_timeout = Duration(seconds=5.0)  # 5 second timeout for stale messages
-        
-        self.get_logger().info("Human clustering node initialized successfully")
-    
+        self.message_timeout = Duration(seconds=5.0)
+
+        self.initialize_subscribers()
+        self.status_timer = self.create_timer(0.2, self.publish_status)
+        self.get_logger().info("Human clustering node initialized successfully") 
+               
     def init_optimization_layer(self):
         """Initialize all optimization components"""
         self.get_logger().info("Initializing optimization layer...")
@@ -349,59 +314,58 @@ class HumanClusteringNode(Node):
                 history=HistoryPolicy.KEEP_LAST,
                 depth=5
             )
-            
-            # Canon R6 control
-            self.photo_command_pub = self.create_publisher(
-                String,
-                '/photo/command',  #
-                qos
+            qos_best_effort = QoSProfile(
+                reliability=ReliabilityPolicy.BEST_EFFORT,
+                history=HistoryPolicy.KEEP_LAST,
+                depth=3
             )
             
             # Keep optimal position for internal use
             self.optimal_pos_pub = self.create_publisher(
                 OptimalPosition,
-                'human_clustering/optimal_position',
+                '/human_clustering/optimal_position',
                 qos
             )
             
             self.start_scan_pub = self.create_publisher(
                 String,
-                'human_clustering/start_scan',
+                '/human_clustering/start_scan',
                 qos
             )
 
             self.clusters_pub = self.create_publisher(
                 ClusterArray,
-                'human_clustering/clusters',
+                '/human_clustering/clusters',
                 qos
             )
 
             self.transformed_humans_pub = self.create_publisher(
                 TransformedHumansArray,
-                'human_clustering/transformed_positions',
+                '/human_clustering/transformed_positions',
                 qos
             )
 
             self.robot_status_pub = self.create_publisher(
                 RobotStatus,
-                'human_clustering/robot_status',
+                '/human_clustering/robot_status',
                 qos
             )
             
             # Performance monitoring publishers
+            # Performance monitoring publishers — BEST_EFFORT: high rate, loss acceptable
             self.performance_pub = self.create_publisher(
                 PerformanceMetrics,
-                'human_clustering/performance',
-                1
+                '/human_clustering/performance',
+                qos_best_effort
             )
             self.fps_pub = self.create_publisher(
                 Float32,
-                'human_clustering/fps',
-                1
+                '/human_clustering/fps',
+                qos_best_effort
             )
             self.tracking_pub = self.create_publisher(
                 ClusterTracking,
-                'human_clustering/tracking',
+                '/human_clustering/tracking',
                 qos
             )
 
@@ -409,17 +373,17 @@ class HumanClusteringNode(Node):
             self.web_clusters_pub = self.create_publisher(
                 MarkerArray,
                 '/web/clusters',
-                10
+                qos_best_effort
             )
             self.web_humans_pub = self.create_publisher(
                 MarkerArray,
                 '/web/humans',
-                10
+                qos_best_effort
             )
             self.web_optimal_pub = self.create_publisher(
                 Marker,
                 '/web/optimal_position',
-                10
+                qos_best_effort
             )
             self.get_logger().info("Web interface publishers initialized (/web/*)")
         except Exception as e:
@@ -838,14 +802,12 @@ class HumanClusteringNode(Node):
 
                 self.current_optimal_position = next_position
             else:
-                # Fallback positions now handled by POI Manager
-                if self.robot_position is not None:
-                    self.get_logger().warn("No valid clusters - POI Manager will handle fallback")
-                    if fallback_positions is not None and len(fallback_positions) > 0:
-                        self.current_optimal_position = fallback_positions[0]
-                    else:
-                        self.get_logger().warn("No positions available for no-subscriber mode")
-                        return
+                # Fallback positions are managed by POI Manager.
+                # In no-subscriber mode with no clusters, nothing to do here.
+                self.get_logger().warn(
+                    "No valid clusters in no-subscriber mode — waiting for POI Manager"
+                )
+                return
 
             if self.current_optimal_position:
                 self.get_logger().info(f"Moving to next position in no-subscriber mode: "
@@ -1041,23 +1003,12 @@ class HumanClusteringNode(Node):
                 return
 
             self.recovery_state = "FALLBACK"
-
-            # Fallback positions now handled by POI Manager
-            if self.robot_position is not None:
-                self.get_logger().warn("Fallback recovery - POI Manager will provide fallback positions")
-
-                if fallback_positions is not None and len(fallback_positions) > 0:
-                    best_fallback = fallback_positions[0]
-                    self.get_logger().info(f"Moving to fallback position: "
-                                f"({best_fallback['position'][0]:.2f}, {best_fallback['position'][1]:.2f})")
-
-                    self.current_optimal_position = best_fallback
-                    self.is_moving = True
-                    self.publish_optimal_position()
-                    self.publish_status()
-                else:
-                    self.get_logger().warn("No suitable fallback positions found")
-                    self.recovery_state = "NORMAL"
+            self.get_logger().warn(
+                "Fallback recovery triggered — POI Manager will provide next positions. "
+                "Resetting recovery state."
+            )
+            self.recovery_state = "NORMAL"
+            self.recovery_attempts = 0
 
         except Exception as e:
             self.get_logger().error(f"Error in fallback positioning: {e}")
@@ -1078,20 +1029,38 @@ class HumanClusteringNode(Node):
             self.get_logger().error(f"Error continuing fallback positioning: {e}")
 
     def load_config(self, config_path: str) -> Dict:
-        """Load configuration from yaml file"""
+        """Load configuration from yaml file, handling both flat and ROS2-wrapped formats."""
         try:
             if not os.path.exists(config_path):
                 self.get_logger().error(f"Config file not found: {config_path}")
                 return {}
-                
+
             with open(config_path, 'r') as f:
-                config = yaml.safe_load(f)
-                self.get_logger().info(f"Loaded configuration from {config_path}")
-                return config
+                raw = yaml.safe_load(f)
+
+            if not isinstance(raw, dict):
+                self.get_logger().error(f"Config file is not a YAML dict: {config_path}")
+                return {}
+
+            # Unwrap ROS2 parameter file format if present:
+            #   {node_name: {ros__parameters: {actual_config}}}
+            # This file is loaded programmatically so the wrapper must be stripped.
+            if len(raw) == 1:
+                top_key = next(iter(raw))
+                inner = raw[top_key]
+                if isinstance(inner, dict) and 'ros__parameters' in inner:
+                    self.get_logger().info(
+                        f"Detected ROS2 parameter wrapper — unwrapping '{top_key}/ros__parameters'"
+                    )
+                    raw = inner['ros__parameters']
+
+            self.get_logger().info(f"Loaded configuration from {config_path}")
+            return raw
+
         except Exception as e:
             self.get_logger().error(f"Error loading config: {e}")
             return {}
-
+    
     def validate_message_timestamp(self, msg) -> bool:
         """Validate message timestamp to detect stale data"""
         try:
@@ -1134,7 +1103,8 @@ class HumanClusteringNode(Node):
                         try:
                             map_pos = self.world_transform.transform_to_map(
                                 [(human.position.x, human.position.y, human.position.z)],
-                                self.config['transform']['camera_frame']
+                                # self.config['transform']['camera_frame']
+                                self.config['transform']['base_frame']
                             )
 
                             if map_pos and len(map_pos) > 0:
@@ -1144,6 +1114,16 @@ class HumanClusteringNode(Node):
                                     continue
                                 if abs(mx) > 1000 or abs(my) > 1000:
                                     continue
+                                
+                                # Distance filter — same as sequential path
+                                if self.robot_position is not None:
+                                    max_dist = self.config.get('camera_specs', {}).get(
+                                        'effective_range', {}).get('max', 8.0)
+                                    human_dist = np.sqrt(
+                                        (mx - self.robot_position[0])**2 +
+                                        (my - self.robot_position[1])**2)
+                                    if human_dist > max_dist:
+                                        continue
 
                                 results[human.tracking_id] = {
                                     'map_position': (mx, my),
@@ -1152,7 +1132,7 @@ class HumanClusteringNode(Node):
                                         human.position.y,
                                         human.position.z
                                     )
-                                }
+                                }                                
                         except Exception as e:
                             self.get_logger().warn(f"Error processing human {human.tracking_id}: {e}")
                             continue
@@ -1168,7 +1148,8 @@ class HumanClusteringNode(Node):
                     try:
                         map_pos = self.world_transform.transform_to_map(
                             [(human.position.x, human.position.y, human.position.z)],
-                            self.config['transform']['camera_frame']
+                            # self.config['transform']['camera_frame']
+                            self.config['transform']['base_frame']
                         )
 
                         if map_pos and len(map_pos) > 0:
@@ -1180,6 +1161,18 @@ class HumanClusteringNode(Node):
                             if abs(mx) > 1000 or abs(my) > 1000:
                                 self.get_logger().debug(f"Filtered unreasonable position for human {human.tracking_id}")
                                 continue
+                            
+                            # Distance filter — reject humans beyond effective range
+                            if self.robot_position is not None:
+                                max_dist = self.config.get('camera_specs', {}).get(
+                                    'effective_range', {}).get('max', 8.0)
+                                human_dist = np.sqrt((mx - self.robot_position[0])**2 +
+                                                    (my - self.robot_position[1])**2)
+                                if human_dist > max_dist:
+                                    self.get_logger().debug(
+                                        f"Filtered far human {human.tracking_id} at {human_dist:.1f}m "
+                                        f"(max {max_dist:.1f}m)")
+                                    continue
 
                             human_positions[human.tracking_id] = {
                                 'map_position': (mx, my),
@@ -1484,9 +1477,9 @@ class HumanClusteringNode(Node):
                         self.get_logger().warn(f"Performance degraded, increasing frame skip to {self.process_every_n_frames}")
 
                 self.last_cleanup_time = self.get_clock().now()
-
-                # Force garbage collection periodically for Jetson
-                gc.collect()
+                # Garbage collection only when memory usage is high (avoid latency spikes)
+                if psutil.virtual_memory().percent > 80:
+                    gc.collect()
 
         except Exception as e:
             self.get_logger().error(f"Error in human callback: {e}")
@@ -1555,51 +1548,14 @@ class HumanClusteringNode(Node):
         except Exception as e:
             self.get_logger().error(f"Error updating map visualization: {e}")
 
-    def run(self):
-        """Main run loop"""
-        try:
-            self.get_logger().info("Human clustering node is running")
-
-            # Status publisher timer with lower frequency for Jetson
-            self.status_timer = self.create_timer(0.2, self.publish_status)
-
-            # Initialize visualization only if enabled
-            if self.config.get('visualization', {}).get('enabled', False):
-                # Initialize matplotlib visualizer
-                if hasattr(self, 'visualizer') and self.visualizer:
-                    if hasattr(self, 'map_handler') and self.map_handler.map_msg is not None:
-                        self.visualizer.update_map_data(self.map_handler.map_msg)
-                    self.visualizer.start_visualization()
-                    
-                    # Map update timer for matplotlib only
-                    self.map_update_timer = self.create_timer(
-                        10.0,  # Reduced frequency for Jetson
-                        self.update_map_visualization
-                    )
-                
-            # Wait for initial data
-            time.sleep(2.0)
-
-            # Force publish initial position if available
-            if self.current_optimal_position:
-                self.get_logger().info("Forcing initial position publish")
-                self.publish_optimal_position()
-
-            # Spin is handled by main()
-            
-        except KeyboardInterrupt:
-            self.get_logger().info("Shutting down...")
-        except Exception as e:
-            self.get_logger().error(f"Error in run loop: {e}")
-        # finally:
-        #     self.cleanup()
+# run() was there before adding the lifecycle nodes
 
     def cleanup(self):
         """Clean up resources"""
         try:
-            if hasattr(self, 'status_timer'):
+            if hasattr(self, 'status_timer') and self.status_timer:
                 self.status_timer.cancel()
-            if hasattr(self, 'map_update_timer'):
+            if hasattr(self, 'map_update_timer') and self.map_update_timer:
                 self.map_update_timer.cancel()
             if hasattr(self, 'no_subscriber_move_timer') and self.no_subscriber_move_timer:
                 self.no_subscriber_move_timer.cancel()
@@ -1659,11 +1615,7 @@ class PerformanceMonitor:
 def main(args=None):
     rclpy.init(args=args)
     node = HumanClusteringNode()
-    
     try:
-        # Call run() to initialize timers and visualization
-        node.run()
-        # Spin the node
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass

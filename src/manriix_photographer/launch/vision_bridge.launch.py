@@ -62,6 +62,22 @@ def generate_launch_description():
         emulate_tty=True,
     )
     
+
+    # Native ZED detections -> MQTT tracking data
+    zed_mqtt_tracking_bridge_node = Node(
+        package='manriix_photographer',
+        executable='zed_mqtt_tracking_bridge',
+        name='zed_mqtt_tracking_bridge',
+        output='screen',
+        parameters=[{
+            'mqtt_host': LaunchConfiguration('mqtt_broker'),
+            'mqtt_port': LaunchConfiguration('mqtt_port'),
+            'mqtt_topic': '/photo_capture/objects_tracking',
+            'base_frame': 'base_footprint', #'base_link',
+            'publish_searching_tracks': True,
+        }],
+    )
+
     return LaunchDescription([
         mqtt_broker_arg,
         mqtt_port_arg,
@@ -70,4 +86,5 @@ def generate_launch_description():
         LogInfo(msg=['MQTT Port: ', LaunchConfiguration('mqtt_port')]),
         ai_photographer_bridge_node,
         vision_bridge_node,
+        zed_mqtt_tracking_bridge_node,
     ])

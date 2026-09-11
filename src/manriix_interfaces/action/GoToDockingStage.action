@@ -1,0 +1,44 @@
+# ============================================================
+# Goal
+# ============================================================
+
+# Why the return was requested.
+#
+# Examples:
+#   "manual"
+#   "battery_low"
+#   "battery_critical"
+#   "mission_complete"
+#
+# This is informational. The docking-stage action itself does
+# not make battery-threshold decisions.
+string reason
+
+---
+# ============================================================
+# Result
+# ============================================================
+
+# True only when Nav2 successfully reaches the saved
+# docking-stage pose.
+bool success
+
+# Human-readable result information.
+string message
+
+---
+# ============================================================
+# Feedback
+# ============================================================
+
+# Nav2-reported remaining path distance in metres.
+float32 distance_remaining
+
+# Current high-level state.
+#
+# Examples:
+#   "waiting_for_nav2"
+#   "goal_sent"
+#   "navigating"
+#   "cancelling"
+string state

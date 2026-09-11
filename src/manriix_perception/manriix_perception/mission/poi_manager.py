@@ -21,14 +21,15 @@ This replaces the simple position optimizer with production-grade POI management
 """
 
 import rclpy
-from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy
+from rclpy.lifecycle import LifecycleNode, State, TransitionCallbackReturn
+from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 import numpy as np
 from typing import Dict, List, Optional, Tuple
 import time
 import math
 import yaml
 import os
+from tf_transformations import euler_from_quaternion  # ADD
 from dataclasses import dataclass
 from enum import Enum
 
@@ -94,7 +95,7 @@ class HighDensityPosition:
     total_photos_taken: int       # Total number of photos taken from this position
     
 
-class POIManager(Node):
+class POIManager(LifecycleNode):
     """
     POI manager for intelligent position optimization.
     
@@ -110,137 +111,194 @@ class POIManager(Node):
     
     def __init__(self):
         super().__init__('poi_manager')
-        
-        # Parameters - Social Navigation
         self.declare_parameter('personal_space_radius', 1.2)
         self.declare_parameter('social_space_radius', 2.5)
         self.declare_parameter('photo_distance_min', 2.0)
         self.declare_parameter('photo_distance_max', 8.0)
         self.declare_parameter('photo_distance_optimal', 3.5)
-        
-        # Parameters - Composition
         self.declare_parameter('rule_of_thirds_weight', 0.3)
         self.declare_parameter('symmetry_weight', 0.2)
         self.declare_parameter('formation_weight', 0.25)
         self.declare_parameter('accessibility_weight', 0.25)
-        
-        # Parameters - Update rates
-        self.declare_parameter('poi_update_rate', 2.0)  # Hz
-        self.declare_parameter('position_stability_time', 3.0)  # seconds
-        
-        # Get parameters
-        self.social_constraints = SocialNavConstraints(
-            personal_space_radius=self.get_parameter('personal_space_radius').value,
-            social_space_radius=self.get_parameter('social_space_radius').value
-        )
-        
-        self.photo_distance_min = self.get_parameter('photo_distance_min').value
-        self.photo_distance_max = self.get_parameter('photo_distance_max').value
-        self.photo_distance_optimal = self.get_parameter('photo_distance_optimal').value
-        
-        # Composition weights
-        self.rule_thirds_weight = self.get_parameter('rule_of_thirds_weight').value
-        self.symmetry_weight = self.get_parameter('symmetry_weight').value
-        self.formation_weight = self.get_parameter('formation_weight').value
-        self.accessibility_weight = self.get_parameter('accessibility_weight').value
-        
-        # State
-        self.current_clusters: List[Dict] = []
-        self.current_pois: List[POI] = []
-        self.robot_position: Optional[np.ndarray] = None
-        self.robot_orientation: Optional[float] = None
-        self.map_data: Optional[OccupancyGrid] = None
-        self.poi_history = {}  # Track POI stability over time
-        
-        # HIGH-DENSITY POSITION MEMORY for intelligent fallback
-        self.high_density_positions: List[HighDensityPosition] = []
-        self.max_stored_positions = 20  # Store top 20 high-density positions
-        self.min_density_threshold = 2.0  # People per square meter to store
-        self.min_success_threshold = 2   # Minimum successful photos to consider storing
-        
-        # INTEGRATE SOPHISTICATED POSITION EVALUATION
-        config = {
-            'map': {'free_threshold': 20, 'occupied_threshold': 80, 'unknown_cell_strategy': 'cautious'},
-            'obstacle': {'min_safety_margin': 2, 'max_safety_margin': 5, 'density_radius': 10, 'complexity_calculation': 'entropy'},
-            'position': {
-                'reachability_check': True, 'history_length': 10, 'composition_history_length': 10,
-                'formation_scores': {
-                    'single_person': 0.7, 'pair': 0.8, 'small_group': 0.85,
-                    'line': 1.0, 'circle': 0.95, 'large_group': 0.75,
-                    'scattered': 0.6, 'formal_pose': 1.0, 'unknown': 0.5
-                },
-                'weights': {'distance': 0.20, 'size': 0.10, 'density': 0.10, 'formation': 0.10, 'stability': 0.10,
-                           'composition': 0.15, 'obstacle_proximity': 0.15, 'environment_complexity': 0.10, 
-                           'path_feasibility': 0.10, 'temporal_consistency': 0.05}
+        self.declare_parameter('poi_update_rate', 2.0)
+        self.declare_parameter('position_stability_time', 3.0)
+        self.declare_parameter('config_path', '')
+
+    def on_configure(self, state: State) -> TransitionCallbackReturn:
+        """Load config, build evaluators, create pubs/subs. Wait for /map before returning."""
+        self.get_logger().info("Configuring POIManager...")
+        try:
+            # Read parameters
+            self.social_constraints = SocialNavConstraints(
+                personal_space_radius=self.get_parameter('personal_space_radius').value,
+                social_space_radius=self.get_parameter('social_space_radius').value
+            )
+            self.photo_distance_min = self.get_parameter('photo_distance_min').value
+            self.photo_distance_max = self.get_parameter('photo_distance_max').value
+            self.photo_distance_optimal = self.get_parameter('photo_distance_optimal').value
+            self.rule_thirds_weight = self.get_parameter('rule_of_thirds_weight').value
+            self.symmetry_weight = self.get_parameter('symmetry_weight').value
+            self.formation_weight = self.get_parameter('formation_weight').value
+            self.accessibility_weight = self.get_parameter('accessibility_weight').value
+
+            # State
+            self.current_clusters: List[Dict] = []
+            self.current_pois: List[POI] = []
+            self.robot_position: Optional[np.ndarray] = None
+            self.robot_orientation: Optional[float] = None
+            self.map_data: Optional[OccupancyGrid] = None
+            self.costmap_data: Optional[OccupancyGrid] = None
+            self.poi_history = {}
+            self.high_density_positions: List[HighDensityPosition] = []
+            self.max_stored_positions = 20
+            self.min_density_threshold = 2.0
+            self.min_success_threshold = 2
+
+            # Load clustering config
+            _clustering_config_path = self.get_parameter('config_path').value \
+                if self.has_parameter('config_path') else ''
+            _yaml_config = {}
+            if _clustering_config_path and os.path.exists(_clustering_config_path):
+                try:
+                    with open(_clustering_config_path, 'r') as f:
+                        _raw = yaml.safe_load(f)
+                    if 'human_clustering_node' in _raw:
+                        _yaml_config = _raw['human_clustering_node'].get('ros__parameters', {})
+                    else:
+                        _yaml_config = _raw
+                    self.get_logger().info(f"POIManager loaded config from {_clustering_config_path}")
+                except Exception as e:
+                    self.get_logger().warn(f"POIManager could not load clustering config: {e} — using defaults")
+
+            config = {
+                'map': _yaml_config.get('map', {
+                    'free_threshold': 20,
+                    'occupied_threshold': 80,
+                    'unknown_cell_strategy': 'cautious'
+                }),
+                'obstacle': _yaml_config.get('obstacle', {
+                    'min_safety_margin': 2,
+                    'max_safety_margin': 5,
+                    'density_radius': 10,
+                    'complexity_calculation': 'entropy'
+                }),
+                'position': {
+                    'reachability_check': _yaml_config.get('position', {}).get('reachability_check', True),
+                    'history_length': _yaml_config.get('position', {}).get('history_length', 10),
+                    'composition_history_length': 10,
+                    'formation_scores': _yaml_config.get('position', {}).get('formation_scores', {
+                        'single_person': 0.7, 'pair': 0.8, 'small_group': 0.85,
+                        'line': 1.0, 'circle': 0.95, 'large_group': 0.75,
+                        'scattered': 0.6, 'formal_pose': 1.0, 'unknown': 0.5
+                    }),
+                    'weights': _yaml_config.get('position', {}).get('weights', {
+                        'size': 0.08, 'density': 0.05, 'formation': 0.10,
+                        'stability': 0.10, 'obstacle_proximity': 0.12,
+                        'environment_complexity': 0.05, 'path_feasibility': 0.16,
+                        'temporal_consistency': 0.05
+                    })
+                }
             }
-        }
-        
-        self.map_handler = MapHandler(config, node=self)
-        self.obstacle_analyzer = ObstacleAnalyzer(config, self.map_handler, node=self)
-        self.position_evaluator = PositionEvaluator(config, self.map_handler, self.obstacle_analyzer, node=self)
-        
-        # CENTRALIZED FALLBACK MANAGEMENT - integrates all fallback strategies
-        self.fallback_manager = FallbackManager(config, node=self)
-        
-        # QoS profiles
-        qos_reliable = QoSProfile(reliability=ReliabilityPolicy.RELIABLE, depth=5)
-        qos_best_effort = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, depth=3)
-        
-        # Subscribers
-        self.clusters_sub = self.create_subscription(
-            ClusterArray,
-            '/human_clustering/clusters',
-            self.clusters_callback,
-            qos_reliable
-        )
-        
-        self.robot_pose_sub = self.create_subscription(
-            Odometry,
-            '/odometry/filtered',
-            self.robot_pose_callback,
-            qos_best_effort
-        )
-        
-        self.map_sub = self.create_subscription(
-            OccupancyGrid,
-            '/map',
-            self.map_callback,
-            qos_reliable
-        )
-        
-        # Publishers
-        self.optimal_position_pub = self.create_publisher(
-            OptimalPosition,
-            '/poi_manager/optimal_positions',
-            qos_reliable
-        )
-        
-        self.all_pois_pub = self.create_publisher(
-            String,  # JSON string of all POIs for visualization
-            '/poi_manager/all_pois',
-            qos_best_effort
-        )
-        
-        # Add POIArray publisher for exploration node integration
-        self.poi_array_pub = self.create_publisher(
-            POIArray,  # Structured POI array for exploration
-            '/poi_manager/poi_array',
-            qos_best_effort
-        )
-        
-        self.poi_metrics_pub = self.create_publisher(
-            String,
-            '/poi_manager/metrics',
-            qos_best_effort
-        )
-        
-        # Control timer
-        update_rate = self.get_parameter('poi_update_rate').value
-        self.control_timer = self.create_timer(1.0/update_rate, self.poi_update_loop)
-        
-        self.get_logger().info("POIManager initialized - Position optimization active")
-        
-        
+
+            self.map_handler = MapHandler(config, node=self)
+            self.obstacle_analyzer = ObstacleAnalyzer(config, self.map_handler, node=self)
+            self.position_evaluator = PositionEvaluator(config, self.map_handler, self.obstacle_analyzer, node=self)
+            self.fallback_manager = FallbackManager(config, node=self)
+
+            # QoS profiles
+            qos_reliable = QoSProfile(reliability=ReliabilityPolicy.RELIABLE, depth=5)
+            qos_best_effort = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, depth=3)
+            qos_map = QoSProfile(
+                reliability=ReliabilityPolicy.RELIABLE,
+                durability=DurabilityPolicy.TRANSIENT_LOCAL,
+                depth=1
+            )
+            qos_costmap = QoSProfile(
+                reliability=ReliabilityPolicy.RELIABLE,
+                durability=DurabilityPolicy.TRANSIENT_LOCAL,
+                depth=1
+            )
+
+            # Subscribers
+            self.clusters_sub = self.create_subscription(
+                ClusterArray, '/human_clustering/clusters',
+                self.clusters_callback, qos_reliable)
+            self.robot_pose_sub = self.create_subscription(
+                Odometry, '/odometry/filtered',
+                self.robot_pose_callback, qos_best_effort)
+            self.map_sub = self.create_subscription(
+                OccupancyGrid, '/map',
+                self.map_callback, qos_map)
+            self.costmap_sub = self.create_subscription(
+                OccupancyGrid, '/local_costmap/costmap',
+                self.costmap_callback, qos_costmap)
+
+            # Publishers
+            self.optimal_position_pub = self.create_publisher(
+                OptimalPosition, '/poi_manager/optimal_positions', qos_reliable)
+            self.all_pois_pub = self.create_publisher(
+                String, '/poi_manager/all_pois', qos_best_effort)
+            self.poi_array_pub = self.create_publisher(
+                POIArray, '/poi_manager/poi_array', qos_best_effort)
+            self.poi_metrics_pub = self.create_publisher(
+                String, '/poi_manager/metrics', qos_best_effort)
+
+            self.get_logger().info("POIManager configured — /map will arrive via TRANSIENT_LOCAL subscription")
+            return TransitionCallbackReturn.SUCCESS
+
+        except Exception as e:
+            self.get_logger().error(f"Configuration failed: {e}")
+            return TransitionCallbackReturn.FAILURE
+
+    def on_activate(self, state: State) -> TransitionCallbackReturn:
+        """Start POI update loop."""
+        self.get_logger().info("Activating POIManager...")
+        try:
+            update_rate = self.get_parameter('poi_update_rate').value
+            self.control_timer = self.create_timer(1.0 / update_rate, self.poi_update_loop)
+            self.get_logger().info(f"POIManager active — update loop at {update_rate}Hz")
+            return TransitionCallbackReturn.SUCCESS
+        except Exception as e:
+            self.get_logger().error(f"Activation failed: {e}")
+            return TransitionCallbackReturn.FAILURE
+
+    def on_deactivate(self, state: State) -> TransitionCallbackReturn:
+        """Stop POI update loop."""
+        self.get_logger().info("Deactivating POIManager...")
+        try:
+            if hasattr(self, 'control_timer') and self.control_timer:
+                self.control_timer.cancel()
+                self.control_timer = None
+            return TransitionCallbackReturn.SUCCESS
+        except Exception as e:
+            self.get_logger().error(f"Deactivation failed: {e}")
+            return TransitionCallbackReturn.FAILURE
+
+    def on_cleanup(self, state: State) -> TransitionCallbackReturn:
+        """Release all resources."""
+        self.get_logger().info("Cleaning up POIManager...")
+        try:
+            if hasattr(self, 'control_timer') and self.control_timer:
+                self.control_timer.cancel()
+            self.current_clusters = []
+            self.current_pois = []
+            self.map_data = None
+            self.costmap_data = None
+            return TransitionCallbackReturn.SUCCESS
+        except Exception as e:
+            self.get_logger().error(f"Cleanup failed: {e}")
+            return TransitionCallbackReturn.FAILURE
+
+    def on_shutdown(self, state: State) -> TransitionCallbackReturn:
+        """Final cleanup."""
+        self.get_logger().info("Shutting down POIManager...")
+        try:
+            if hasattr(self, 'control_timer') and self.control_timer:
+                self.control_timer.cancel()
+            return TransitionCallbackReturn.SUCCESS
+        except Exception as e:
+            self.get_logger().error(f"Shutdown failed: {e}")
+            return TransitionCallbackReturn.FAILURE        
     def _validate_position(self, position: np.ndarray) -> bool:
         """Validate position array for NaN/Inf values"""
         try:
@@ -308,7 +366,7 @@ class POIManager(Node):
             ])
             
             # Extract orientation
-            from tf_transformations import euler_from_quaternion
+            # from tf_transformations import euler_from_quaternion
             q = msg.pose.pose.orientation
             _, _, yaw = euler_from_quaternion([q.x, q.y, q.z, q.w])
             self.robot_orientation = yaw
@@ -321,12 +379,15 @@ class POIManager(Node):
         """Update map for obstacle avoidance"""
         self.map_data = msg
         
-        
+    def costmap_callback(self, msg: OccupancyGrid):
+        """Live costmap — includes dynamic obstacles (people, moving objects)"""
+        self.costmap_data = msg
+
     def poi_update_loop(self):
             """Main POI calculation and update loop"""
             try:
                 # ADD THIS DEBUG LINE:
-                self.get_logger().info(f"POI update loop - clusters: {len(self.current_clusters) if hasattr(self, 'current_clusters') else 'not initialized'}")
+                self.get_logger().debug(f"POI update loop - clusters: {len(self.current_clusters) if hasattr(self, 'current_clusters') else 'not initialized'}")
                 
                 if not self.current_clusters:
                     return
@@ -364,7 +425,7 @@ class POIManager(Node):
             cluster_center = cluster['center']
 
             # ADD THIS DEBUG LINE:
-            self.get_logger().info(f"Calculating POIs for cluster {cluster.get('id', '?')}: center={cluster_center}, size={cluster.get('size')}, formation={cluster.get('formation')}")
+            self.get_logger().debug(f"Calculating POIs for cluster {cluster.get('id', '?')}: center={cluster_center}, size={cluster.get('size')}, formation={cluster.get('formation')}")
 
             # Validate cluster center before processing
             if not self._validate_position(cluster_center):
@@ -408,7 +469,7 @@ class POIManager(Node):
                 poi.priority_score = self.calculate_priority_score(poi, cluster)
                 
                 # ADD THIS DEBUG:
-                self.get_logger().info(f"  Final check: access={poi.accessibility_score:.2f}, social_dist={poi.social_distance:.2f}m, min={self.social_constraints.personal_space_radius:.2f}m, PASS={poi.accessibility_score > 0.3 and poi.social_distance >= self.social_constraints.personal_space_radius}")
+                self.get_logger().debug(f"  Final check: access={poi.accessibility_score:.2f}, social_dist={poi.social_distance:.2f}m, min={self.social_constraints.personal_space_radius:.2f}m, PASS={poi.accessibility_score > 0.3 and poi.social_distance >= self.social_constraints.personal_space_radius}")
 
                 # Only keep POIs that meet minimum requirements
                 if (poi.accessibility_score >= 0.3 and 
@@ -416,7 +477,7 @@ class POIManager(Node):
                     pois.append(poi)
             
             # ADD THIS DEBUG LINE BEFORE RETURN:
-            self.get_logger().info(f"Generated {len(pois)} POIs for cluster {cluster.get('id', '?')}")
+            self.get_logger().debug(f"Generated {len(pois)} POIs for cluster {cluster.get('id', '?')}")
             return pois
             
         except Exception as e:
@@ -508,7 +569,7 @@ class POIManager(Node):
                 positions.append(position)
 
             # ADD THIS DEBUG LINE:
-            self.get_logger().info(f"Generated {len(positions)} candidate positions at distance {optimal_distance:.2f}m")
+            self.get_logger().debug(f"Generated {len(positions)} candidate positions at distance {optimal_distance:.2f}m")
                 
             return positions
             
@@ -587,11 +648,16 @@ class POIManager(Node):
             if self.map_data is None:
                 return 0.7  # Default moderate accessibility
                 
-            # Check if position is in free space
-            is_free = self.is_position_free(poi.position)
-            
+            # # Check if position is in free space
+            # is_free = self.is_position_free(poi.position)
+
+            # Check if position is a permanent obstacle (walls only — static map)
+            # Do NOT use live costmap here: a bystander walking through the
+            # photography position momentarily should NOT reject the POI entirely
+            is_free = self.is_position_free(poi.position, static_only=True)
+                        
             # ADD THIS DEBUG:
-            self.get_logger().info(f"  POI at [{poi.position[0]:.2f}, {poi.position[1]:.2f}]: is_free={is_free}")
+            self.get_logger().debug(f"  POI at [{poi.position[0]:.2f}, {poi.position[1]:.2f}]: is_free={is_free}")
             
             if not is_free:
                 return 0.0  # Position is blocked
@@ -605,6 +671,12 @@ class POIManager(Node):
             # Distance penalty - very far positions are less accessible
             if self.robot_position is not None:
                 distance = np.linalg.norm(poi.position - self.robot_position)
+
+                # ADD: hard reject — POI too far to be useful
+                # Stops 20m POIs that slipped through clustering filter
+                if distance > 15.0:
+                    return 0.0
+                                
                 distance_penalty = min(1.0, distance / 20.0)  # Penalty starts at 20m
                 return max(0.3, 1.0 - distance_penalty)
                 
@@ -613,14 +685,17 @@ class POIManager(Node):
         except Exception as e:
             self.get_logger().error(f"Error calculating accessibility score: {e}")
             return 0.5
-            
-            
-    def is_position_free(self, position: np.ndarray) -> bool:
-        """Check if position is in free space on map with NaN validation"""
-        try:
-            if self.map_data is None:
-                return True
 
+    # REPLACE WITH:
+    def is_position_free(self, position: np.ndarray, static_only: bool = False) -> bool:
+        try:
+            if static_only or self.costmap_data is None:
+                map_to_check = self.map_data
+            else:
+                map_to_check = self.costmap_data    
+            if map_to_check is None:
+                return True
+            
             # Validate position before using
             if not self._validate_position(position):
                 self.get_logger().debug("is_position_free: invalid position (NaN/Inf)")
@@ -629,27 +704,27 @@ class POIManager(Node):
             # Convert world coordinates to map coordinates
             pos_x = float(position[0])
             pos_y = float(position[1])
-            origin_x = float(self.map_data.info.origin.position.x)
-            origin_y = float(self.map_data.info.origin.position.y)
-            resolution = float(self.map_data.info.resolution)
+            # resolution = float(self.map_data.info.resolution)
+            origin_x = float(map_to_check.info.origin.position.x)
+            origin_y = float(map_to_check.info.origin.position.y)
+            resolution = float(map_to_check.info.resolution)
 
             if resolution <= 0:
                 return True
 
             map_x = int((pos_x - origin_x) / resolution)
             map_y = int((pos_y - origin_y) / resolution)
-
-            # Check bounds
-            if (map_x < 0 or map_x >= self.map_data.info.width or
-                map_y < 0 or map_y >= self.map_data.info.height):
+            
+            if (map_x < 0 or map_x >= map_to_check.info.width or
+                map_y < 0 or map_y >= map_to_check.info.height):
                 return False
-
+        
             # Check occupancy
-            index = map_y * self.map_data.info.width + map_x
-            if index < len(self.map_data.data):
-                occupancy = self.map_data.data[index]
-                return occupancy < 50  # Free if less than 50% occupied
-
+            index = map_y * map_to_check.info.width + map_x
+            if index < len(map_to_check.data):
+                occupancy = map_to_check.data[index]            
+                # return occupancy < 50  # Free if less than 50% occupied
+                return 0 <= occupancy < 50
             return False
 
         except (TypeError, ValueError) as e:
@@ -678,7 +753,7 @@ class POIManager(Node):
             for i in range(num_samples + 1):
                 t = i / max(num_samples, 1)
                 sample_point = start + t * (end - start)
-                if not self.is_position_free(sample_point):
+                if not self.is_position_free(sample_point, static_only=True):
                     return False
 
             return True
@@ -691,8 +766,20 @@ class POIManager(Node):
         """Calculate sophisticated priority score using integrated position evaluation"""
         try:
             # Convert POI to position evaluation format
+            # position_dict = {
+            #     'position': poi.position,
+            #     'cluster_size': cluster['size'],
+            #     'formation': poi.formation_type.value,
+            #     'track_id': cluster.get('track_id', -1),
+            #     'stability': cluster.get('stability', poi.stability_score),
+            #     'density': cluster.get('density', self.calculate_crowd_density(cluster)),
+            #     'is_backup': False
+            # }
+
+            # ADD one line:
             position_dict = {
                 'position': poi.position,
+                'cluster_center': cluster['center'],    # ← ADD THIS
                 'cluster_size': cluster['size'],
                 'formation': poi.formation_type.value,
                 'track_id': cluster.get('track_id', -1),
@@ -700,7 +787,7 @@ class POIManager(Node):
                 'density': cluster.get('density', self.calculate_crowd_density(cluster)),
                 'is_backup': False
             }
-            
+
             # Use sophisticated 10-factor scoring from position evaluator
             robot_pos = self.robot_position if self.robot_position is not None else np.zeros(2)
             sophisticated_score = self.position_evaluator.calculate_priority_score(position_dict, robot_pos)
@@ -923,18 +1010,24 @@ class POIManager(Node):
                 'average_stability_score': avg_stability,
                 'average_social_distance_score': avg_social,
 
-                # Position evaluator 10-factor breakdown (from config weights)
+                # # Position evaluator 10-factor breakdown (from config weights)
+                # 'scoring_factors': {
+                #     'distance': {'weight': 0.20, 'description': 'Proximity to robot'},
+                #     'size': {'weight': 0.10, 'description': 'Cluster size'},
+                #     'density': {'weight': 0.10, 'description': 'Crowd density'},
+                #     'formation': {'weight': 0.10, 'description': 'Group arrangement'},
+                #     'stability': {'weight': 0.10, 'description': 'Temporal stability'},
+                #     'composition': {'weight': 0.15, 'description': 'Group consistency'},
+                #     'obstacle_proximity': {'weight': 0.15, 'description': 'Clear of obstacles'},
+                #     'environment_complexity': {'weight': 0.10, 'description': 'Navigation ease'},
+                #     'path_feasibility': {'weight': 0.10, 'description': 'Path clearance'},
+                #     'temporal_consistency': {'weight': 0.05, 'description': 'Position history'}
+                # },
+
+                # Position evaluator 10-factor breakdown (actual weights from config)
                 'scoring_factors': {
-                    'distance': {'weight': 0.20, 'description': 'Proximity to robot'},
-                    'size': {'weight': 0.10, 'description': 'Cluster size'},
-                    'density': {'weight': 0.10, 'description': 'Crowd density'},
-                    'formation': {'weight': 0.10, 'description': 'Group arrangement'},
-                    'stability': {'weight': 0.10, 'description': 'Temporal stability'},
-                    'composition': {'weight': 0.15, 'description': 'Group consistency'},
-                    'obstacle_proximity': {'weight': 0.15, 'description': 'Clear of obstacles'},
-                    'environment_complexity': {'weight': 0.10, 'description': 'Navigation ease'},
-                    'path_feasibility': {'weight': 0.10, 'description': 'Path clearance'},
-                    'temporal_consistency': {'weight': 0.05, 'description': 'Position history'}
+                    k: {'weight': float(v), 'description': k.replace('_', ' ').title()}
+                    for k, v in self.position_evaluator.weights.items()
                 },
 
                 # Formation distribution
@@ -992,8 +1085,24 @@ class POIManager(Node):
                                      f"success_count={existing_position.success_count}")
             else:
                 # Create new high-density position
-                accessibility = self.calculate_accessibility_score(position)
-                
+                # accessibility = self.calculate_accessibility_score(position)
+
+                # REPLACE WITH:
+                # calculate_accessibility_score expects a POI object, not np.ndarray
+                _temp_poi = POI(
+                    position=position,
+                    orientation=0.0,
+                    priority_score=0.0,
+                    cluster_id=-1,
+                    formation_type=FormationType.SCATTERED,
+                    social_distance=0.0,
+                    aesthetic_score=0.0,
+                    accessibility_score=0.0,
+                    stability_score=0.0,
+                    multi_angle_set=[]
+                )
+                accessibility = self.calculate_accessibility_score(_temp_poi)
+
                 new_position = HighDensityPosition(
                     position=position.copy(),
                     max_density=density,
@@ -1104,7 +1213,6 @@ class POIManager(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = POIManager()
-    
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

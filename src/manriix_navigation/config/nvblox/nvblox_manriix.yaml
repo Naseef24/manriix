@@ -1,0 +1,62 @@
+# ============================================================================
+# Manriix-specific nvblox overrides
+#
+# Loaded as the THIRD layer after NVIDIA's:
+#   1. /opt/ros/humble/share/nvblox_examples_bringup/config/nvblox/nvblox_base.yaml
+#   2. /opt/ros/humble/share/nvblox_examples_bringup/config/nvblox/specializations/nvblox_zed.yaml
+#   3. THIS FILE — manriix-specific
+#
+# Only overrides what's different from NVIDIA's recommendations for our robot.
+# Keep this minimal — every override has a reason documented inline.
+# ============================================================================
+
+/**:
+  ros__parameters:
+    # ── Map clearing frame — use base_footprint (URDF navigation root) ──
+    # NVIDIA's nvblox_zed.yaml sets this to "zed_camera_link" but our robot's
+    # URDF uses base_footprint as the navigation root.
+    map_clearing_frame_id: "base_footprint"
+
+    # ── Map clearing disabled — keep the full map as we drive ──
+    # NVIDIA's base default is 7.0m (rolling window — old data discarded).
+    # For venue mapping we want the FULL accumulated map preserved.
+    # Negative value = no clearing per nvblox_base.yaml comment.
+    map_clearing_radius_m: -1.0
+
+    # ── TSDF decay disabled — preserve map across sessions ──
+    # NVIDIA's base default is 5.0 Hz (slow forgetting of stale voxels).
+    # For venue mapping we drive once and want the map preserved.
+    # Confirmed fix per NVIDIA Isaac ROS forums:
+    #   https://forums.developer.nvidia.com/t/isaac-ros-nvblox-mapping/314258
+    decay_tsdf_rate_hz: 0.0
+
+    # ── Visualization frames — use base_footprint ──
+    esdf_slice_bounds_visualization_attachment_frame_id: "base_footprint"
+    workspace_height_bounds_visualization_attachment_frame_id: "base_footprint"
+
+    # ── Console output — useful diagnostics for venue robot ──
+    print_rates_to_console: true
+    print_queue_drops_to_console: true
+
+    # ── Processing rates — reduced for Jetson Orin AGX power balance ──
+    # NVIDIA base sets integrate_depth at 40 Hz. Our ZED publishes at 15 Hz
+    # (per zedx_front_depth.yaml). 20 Hz cap is enough headroom.
+    integrate_depth_rate_hz: 20.0
+
+    static_mapper:
+      # ── Static mapper decay safety belt ──
+      # Even with decay_tsdf_rate_hz: 0.0, ensure blocks aren't deallocated.
+      decay_integrator_deallocate_decayed_blocks: false
+      exclude_last_view_from_decay: true
+
+      # ── ESDF slice — height range for the 2D Nav2 costmap layer ──
+      # Heights are relative to base_footprint (ground level, Z=0).
+      # NVIDIA's nvblox_zed.yaml sets slice_height=0.0, min=-0.1, max=0.3
+      # (relative to zed_camera_link, which is up high).
+      # For Manriix robot at ~base_footprint, we want:
+      #   slice_height: 0.50 m — center on torso height (people detection)
+      #   min: 0.10 m — above floor
+      #   max: 0.90 m — captures torsos, chair backs, table edges
+      esdf_slice_height:     0.50
+      esdf_slice_min_height: 0.10
+      esdf_slice_max_height: 0.90

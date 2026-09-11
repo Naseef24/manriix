@@ -16,7 +16,7 @@ def generate_launch_description():
     # ============================================
     # FILE PATHS
     # ============================================
-    urdf_file = os.path.join(description_pkg, 'urdf', 'manriix.urdf.xacro')
+    urdf_file = os.path.join(description_pkg, 'urdf', 'manriix2.urdf.xacro')
     controllers_file = os.path.join(hardware_pkg, 'config', 'manriix_controllers.yaml')
     rviz_file = os.path.join(description_pkg, 'rviz2', 'display.rviz')
     

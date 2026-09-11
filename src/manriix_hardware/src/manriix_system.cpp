@@ -5,6 +5,15 @@
 #include <string>
 #include <iostream>
 
+#define C_RESET        "\033[0m"
+#define C_BOLD         "\033[1m"
+#define C_UNCONFIGURED "\033[90m"   // dark grey
+#define C_INACTIVE     "\033[33m"   // yellow
+#define C_ACTIVE       "\033[32m"   // green
+#define C_SHUTDOWN     "\033[31m"   // red
+#define C_THREAD       "\033[36m"   // cyan
+#define C_FEEDBACK     "\033[35m"   // magenta
+
 namespace manriix_hardware
 {
 
@@ -171,42 +180,123 @@ hardware_interface::CallbackReturn ManriixSystem::on_activate(
     std::cout << "  Check CAN bus connections and power." << std::endl;
   }
 
-  std::cout << "✓ Motor system activation complete\n" << std::endl;
+  // std::cout << "✓ Motor system activation complete\n" << std::endl;
   
-  return hardware_interface::CallbackReturn::SUCCESS;
+  // return hardware_interface::CallbackReturn::SUCCESS;
+  // Start background receive threads for closed-loop feedback
+  if (steering_available_) {
+    steering_interface_->startReceiveThread();
+    std::cout << C_THREAD C_BOLD "[THREAD]" C_RESET
+              << " CubeMars receive thread started" << std::endl;
+  }
+
+  if (wheels_available_) {
+    wheel_interface_->startReceiveThread();
+    std::cout << C_THREAD C_BOLD "[THREAD]" C_RESET
+              << " Zltech receive thread started" << std::endl;
+  }
+
+  std::cout << C_ACTIVE C_BOLD "[ACTIVE]" C_RESET
+            << " Motor system activation complete\n" << std::endl;
+
+  return hardware_interface::CallbackReturn::SUCCESS;  
 }
+
+// hardware_interface::CallbackReturn ManriixSystem::on_deactivate(
+//   const rclcpp_lifecycle::State & /*previous_state*/)
+// {
+//   std::cout << "\n→ Deactivating Manriix Motor Hardware..." << std::endl;
+  
+//   // Stop and shutdown available motors
+//   if (wheels_available_) {
+//     std::cout << "  → Stopping wheel motors..." << std::endl;
+//     wheel_interface_->stopMotors();
+//   }
+  
+//   if (steering_available_) {
+//     std::cout << "  → Shutting down steering interface..." << std::endl;
+//     steering_interface_->shutdown();
+//   }
+  
+//   if (wheels_available_) {
+//     std::cout << "  → Shutting down wheel interface..." << std::endl;
+//     wheel_interface_->shutdown();
+//   }
+  
+//   std::cout << "✓ Motor system deactivated\n" << std::endl;
+
+//   return hardware_interface::CallbackReturn::SUCCESS;
+// }
 
 hardware_interface::CallbackReturn ManriixSystem::on_deactivate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  std::cout << "\n→ Deactivating Manriix Motor Hardware..." << std::endl;
-  
-  // Stop and shutdown available motors
+  std::cout << C_INACTIVE C_BOLD "[INACTIVE]" C_RESET
+            << " Deactivating Manriix Motor Hardware..." << std::endl;
+
+  // Stop receive threads first — before closing sockets
+  if (steering_available_) {
+    std::cout << "  → Stopping CubeMars receive thread..." << std::endl;
+    steering_interface_->stopReceiveThread();
+  }
+
+  if (wheels_available_) {
+    std::cout << "  → Stopping Zltech receive thread..." << std::endl;
+    wheel_interface_->stopReceiveThread();
+  }
+
+  // Stop motors
   if (wheels_available_) {
     std::cout << "  → Stopping wheel motors..." << std::endl;
     wheel_interface_->stopMotors();
   }
-  
+
   if (steering_available_) {
     std::cout << "  → Shutting down steering interface..." << std::endl;
     steering_interface_->shutdown();
   }
-  
+
   if (wheels_available_) {
     std::cout << "  → Shutting down wheel interface..." << std::endl;
     wheel_interface_->shutdown();
   }
-  
-  std::cout << "✓ Motor system deactivated\n" << std::endl;
+
+  std::cout << C_INACTIVE C_BOLD "[INACTIVE]" C_RESET
+            << " Motor system deactivated\n" << std::endl;
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
+// hardware_interface::return_type ManriixSystem::read(
+//   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
+// {
+//   // Non-blocking read - motors broadcast state automatically via CAN
+//   // State variables maintain last known values from CAN broadcasts
+//   return hardware_interface::return_type::OK;
+// }
 hardware_interface::return_type ManriixSystem::read(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-  // Non-blocking read - motors broadcast state automatically via CAN
-  // State variables maintain last known values from CAN broadcasts
+  // Copy actual feedback from background threads into state interfaces
+  // Both getActual*() calls are mutex-protected and complete in microseconds
+  // No blocking, no CAN communication in this function
+
+  if (steering_available_) {
+    std::vector<double> positions_deg;
+    steering_interface_->getActualPositions(positions_deg);
+    for (size_t i = 0; i < steering_positions_.size() && i < positions_deg.size(); i++) {
+      steering_positions_[i] = positions_deg[i] * DEG_TO_RAD;
+    }
+  }
+
+  if (wheels_available_) {
+    std::vector<double> velocities_rpm;
+    wheel_interface_->getActualVelocities(velocities_rpm);
+    for (size_t i = 0; i < wheel_velocities_.size() && i < velocities_rpm.size(); i++) {
+      wheel_velocities_[i] = velocities_rpm[i] * RPM_TO_RAD_S;
+    }
+  }
+
   return hardware_interface::return_type::OK;
 }
 

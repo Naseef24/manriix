@@ -19,6 +19,7 @@ class ClusterTracker:
         self.max_tracks = tracking_config.get('max_tracks', 100)
         self.max_age = tracking_config.get('max_age', 10)
         self.min_hits = tracking_config.get('min_hits', 3)
+        self.max_match_distance = tracking_config.get('hungarian_max_distance', 2.0)
         
         # Track storage
         self.tracks = {}
@@ -92,7 +93,7 @@ class ClusterTracker:
         row_ind, col_ind = linear_sum_assignment(cost_matrix)
         
         # Filter matches by distance threshold
-        max_distance = 2.0
+        max_distance = self.max_match_distance
         matched = []
         matched_cluster_indices = set()
         

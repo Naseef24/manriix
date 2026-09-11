@@ -5,7 +5,7 @@ import math
 
 import rclpy
 import rclpy.logging
-from rclpy.node import Node
+from rclpy.lifecycle import LifecycleNode, TransitionCallbackReturn
 from tf2_ros import TransformBroadcaster
 from geometry_msgs.msg import TransformStamped
 
@@ -17,7 +17,7 @@ from .check_sum import calc_crc16, calc_crc32
 from dji_rs3pro_ros_controller.msg import EularAngle
 
 
-class GimbalBase(Node):
+class GimbalBase(LifecycleNode):
     def __init__(self):
         super().__init__('rs3pro_gimbal_base')
         # Enable colored logging
@@ -49,9 +49,57 @@ class GimbalBase(Node):
 
         # Initialize Transform Broadcaster
         self.br = TransformBroadcaster(self)
-        
-        # Set parameters
-        self.set_param()
+
+        # ANSI colour helpers — used by subclass for terminal output
+        self._C_GREEN  = '\033[92m'
+        self._C_YELLOW = '\033[93m'
+        self._C_RED    = '\033[91m'
+        self._C_CYAN   = '\033[96m'
+        self._C_RESET  = '\033[0m'
+
+# CAN watchdog — updated on every received frame
+        self._last_can_rx_time = None
+
+        # Publishers and subscriber created in on_configure()
+        self.pub_can_command = None
+        self.pub_eular_angle = None
+        self.sub_can_data = None
+
+        self.get_logger().info(
+            '\033[96m[GIMBAL BASE] Node created — waiting for configure\033[0m')
+
+    def on_configure(self, state):
+        self.get_logger().info(
+            '\033[96m[GIMBAL BASE] Configuring — creating publishers and subscriber\033[0m')
+        self.pub_can_command = self.create_publisher(Frame, 'to_can_bus', 10)
+        self.pub_eular_angle = self.create_publisher(EularAngle, '/gimbal_angle', 10)
+        self.sub_can_data = self.create_subscription(
+            Frame, 'from_can_bus', self.can_callback, 10)
+        self.get_logger().info(
+            '\033[92m[GIMBAL BASE] Publishers and subscriber ready\033[0m')
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_activate(self, state):
+        self.get_logger().info(
+            '\033[92m[GIMBAL BASE] Activating\033[0m')
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_deactivate(self, state):
+        self.get_logger().info(
+            '\033[93m[GIMBAL BASE] Deactivating\033[0m')
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_cleanup(self, state):
+        self.pub_can_command = None
+        self.pub_eular_angle = None
+        self.sub_can_data = None
+        self._last_can_rx_time = None
+        self.get_logger().info(
+            '\033[93m[GIMBAL BASE] Cleaned up\033[0m')
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_shutdown(self, state):
+        return TransitionCallbackReturn.SUCCESS
 
     def parse_position_response(self, data_frame):
         pos_data = data_frame[16:-4]
@@ -73,38 +121,85 @@ class GimbalBase(Node):
         # Publish transforms
         self.publish_transforms()
 
-    def publish_transforms(self):
-        # Transform from map to gimbal_base
-        t1 = TransformStamped()
-        t1.header.stamp = self.get_clock().now().to_msg()
-        t1.header.frame_id = 'map'
-        t1.child_frame_id = 'gimbal_base'
-        t1.transform.translation.x = 0.0
-        t1.transform.translation.y = 0.0
-        t1.transform.translation.z = -1.0
-        t1.transform.rotation.x = 0.0
-        t1.transform.rotation.y = 0.0
-        t1.transform.rotation.z = 0.0
-        t1.transform.rotation.w = 1.0
-        self.br.sendTransform(t1)
+    # def publish_transforms(self):
+    #     # Transform from map to gimbal_base
+    #     t1 = TransformStamped()
+    #     t1.header.stamp = self.get_clock().now().to_msg()
+    #     t1.header.frame_id = 'map'
+    #     t1.child_frame_id = 'gimbal_base'
+    #     t1.transform.translation.x = 0.0
+    #     t1.transform.translation.y = 0.0
+    #     t1.transform.translation.z = -1.0
+    #     t1.transform.rotation.x = 0.0
+    #     t1.transform.rotation.y = 0.0
+    #     t1.transform.rotation.z = 0.0
+    #     t1.transform.rotation.w = 1.0
+    #     self.br.sendTransform(t1)
 
-        # Transform from gimbal_base to end_effector with gimbal angles
-        t2 = TransformStamped()
-        t2.header.stamp = self.get_clock().now().to_msg()
-        t2.header.frame_id = 'gimbal_base'
-        t2.child_frame_id = 'end_effector'
-        t2.transform.translation.x = 0.0
-        t2.transform.translation.y = 0.0
-        t2.transform.translation.z = 0.0
+    #     # Transform from gimbal_base to end_effector with gimbal angles
+    #     t2 = TransformStamped()
+    #     t2.header.stamp = self.get_clock().now().to_msg()
+    #     t2.header.frame_id = 'gimbal_base'
+    #     t2.child_frame_id = 'end_effector'
+    #     t2.transform.translation.x = 0.0
+    #     t2.transform.translation.y = 0.0
+    #     t2.transform.translation.z = 0.0
         
-        # Convert Euler to Quaternion
-        quat = self.euler_to_quaternion(self.roll, self.pitch, self.yaw)
-        t2.transform.rotation.x = quat[0]
-        t2.transform.rotation.y = quat[1]
-        t2.transform.rotation.z = quat[2]
-        t2.transform.rotation.w = quat[3]
-        self.br.sendTransform(t2)
+    #     # Convert Euler to Quaternion
+    #     quat = self.euler_to_quaternion(self.roll, self.pitch, self.yaw)
+    #     t2.transform.rotation.x = quat[0]
+    #     t2.transform.rotation.y = quat[1]
+    #     t2.transform.rotation.z = quat[2]
+    #     t2.transform.rotation.w = quat[3]
+    #     self.br.sendTransform(t2)
 
+    def publish_transforms(self):
+        stamp = self.get_clock().now().to_msg()
+
+        # ── base_link → gimbal_yaw_link (yaw around Z-) ───────────
+        t_yaw = TransformStamped()
+        t_yaw.header.stamp = stamp
+        t_yaw.header.frame_id = 'base_link'
+        t_yaw.child_frame_id = 'gimbal_yaw_link'
+        t_yaw.transform.translation.x = 0.0079992
+        t_yaw.transform.translation.y = 0.0
+        t_yaw.transform.translation.z = 0.92103
+        quat_yaw = self.euler_to_quaternion(0.0, 0.0, -self.yaw)
+        t_yaw.transform.rotation.x = quat_yaw[0]
+        t_yaw.transform.rotation.y = quat_yaw[1]
+        t_yaw.transform.rotation.z = quat_yaw[2]
+        t_yaw.transform.rotation.w = quat_yaw[3]
+
+        # ── gimbal_yaw_link → gimbal_pitch_link (pitch) ───────────
+        t_pitch = TransformStamped()
+        t_pitch.header.stamp = stamp
+        t_pitch.header.frame_id = 'gimbal_yaw_link'
+        t_pitch.child_frame_id = 'gimbal_pitch_link'
+        t_pitch.transform.translation.x = -0.14482
+        t_pitch.transform.translation.y = 0.0
+        t_pitch.transform.translation.z = 0.08258
+        quat_pitch = self.euler_to_quaternion(0.0, -self.pitch, 0.0)
+        t_pitch.transform.rotation.x = quat_pitch[0]
+        t_pitch.transform.rotation.y = quat_pitch[1]
+        t_pitch.transform.rotation.z = quat_pitch[2]
+        t_pitch.transform.rotation.w = quat_pitch[3]
+
+        # ── gimbal_pitch_link → gimbal_roll_link (roll) ───────────
+        t_roll = TransformStamped()
+        t_roll.header.stamp = stamp
+        t_roll.header.frame_id = 'gimbal_pitch_link'
+        t_roll.child_frame_id = 'gimbal_roll_link'
+        t_roll.transform.translation.x = 0.15625
+        t_roll.transform.translation.y = -0.11228
+        t_roll.transform.translation.z = 0.10941
+        quat_roll = self.euler_to_quaternion(self.roll, 0.0, 0.0)
+        t_roll.transform.rotation.x = quat_roll[0]
+        t_roll.transform.rotation.y = quat_roll[1]
+        t_roll.transform.rotation.z = quat_roll[2]
+        t_roll.transform.rotation.w = quat_roll[3]
+
+        self.br.sendTransform([t_yaw, t_pitch, t_roll])
+        
     def euler_to_quaternion(self, roll, pitch, yaw):
         """Convert Euler angles to quaternion"""
         cy = math.cos(yaw * 0.5)
@@ -122,6 +217,7 @@ class GimbalBase(Node):
         return [qx, qy, qz, qw]
 
     def can_callback(self, data):
+        self._last_can_rx_time = self.get_clock().now()
         if data.id == self.recv_id:
             tmp_byte_data = []
             for i in data.data:
@@ -293,23 +389,12 @@ class GimbalBase(Node):
         pub_angle.roll = self.roll
         self.pub_eular_angle.publish(pub_angle)
 
-    def set_param(self):
-        # Create timer for main loop (1000 Hz)
-        self.timer = self.create_timer(0.02, self.timer_callback)
-        
-        # Create subscribers and publishers
-        self.sub_can_data = self.create_subscription(
-            Frame, 'from_can_bus', self.can_callback, 10)
-        
-        self.pub_can_command = self.create_publisher(Frame, 'to_can_bus', 10)
-        self.pub_eular_angle = self.create_publisher(EularAngle, '/gimbal_angle', 10)
-        
-        # Set hyperparameters
-        self.set_hyperparams()
-
-    def timer_callback(self):
-        self.request_current_position()
-        self.publish_current_position()
+    def can_is_alive(self):
+            """Returns True if a CAN frame was received within the last 1.0 seconds."""
+            if self._last_can_rx_time is None:
+                return False
+            elapsed = (self.get_clock().now() - self._last_can_rx_time).nanoseconds / 1e9
+            return elapsed < 1.0
 
 
 def main(args=None):

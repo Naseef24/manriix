@@ -7,7 +7,7 @@ import time
 
 import rclpy
 import rclpy.logging
-from rclpy.node import Node
+from rclpy.lifecycle import TransitionCallbackReturn
 from tf2_ros import Buffer, TransformListener
 from geometry_msgs.msg import Point
 
@@ -34,7 +34,9 @@ class GimbalController(GimbalBase):
         # Enable colored logging
         rclpy.logging.set_logger_level(self.get_logger().name, rclpy.logging.LoggingSeverity.INFO)
         
-        self.get_logger().info("Initializing Full Gimbal Controller")
+        self.get_logger().info(
+            f'\033[96m[GIMBAL CTRL] Initializing DJI RS3 Pro controller — '
+            f'can3  send_id=0x{self.send_id:03X}  recv_id=0x{self.recv_id:03X}\033[0m')
         
         # Declare and get parameters
         self.declare_parameters(
@@ -74,19 +76,21 @@ class GimbalController(GimbalBase):
         self.last_change_time = 0.0
         self.current_yaw_side = 1
         self.last_gimbal_cmd = None
-        
-        # Set up controller-specific parameters
-        self.set_param_in_controller()
+        self._last_no_can_warn_time = 0.0    
 
-    def set_param_in_controller(self):
-        # Override timer to slower rate
-        self.destroy_timer(self.timer)
-        self.timer = self.create_timer(0.1, self.controller_callback)  # 10 Hz
-        
-        # TF2 setup
+        self.get_logger().info(
+            f'\033[96m[GIMBAL CTRL] Node created — send_id=0x{self.send_id:03X}  recv_id=0x{self.recv_id:03X}\033[0m')
+
+    def on_configure(self, state):
+        # Call parent on_configure first — creates CAN publishers/subscriber
+        ret = super().on_configure(state)
+        if ret != TransitionCallbackReturn.SUCCESS:
+            return ret
+
+        # TF2
         self.tfBuffer = Buffer()
         self.listener = TransformListener(self.tfBuffer, self)
-        
+
         # Subscriptions
         self.sub_imu_data = self.create_subscription(
             Imu, "/imu/data", self.imu_data_callback, 10)
@@ -96,13 +100,13 @@ class GimbalController(GimbalBase):
             GimbalCmd, '/gimbalCmd', self.request_target_position, 10)
         self.focus_position_sub = self.create_subscription(
             Int32, 'set_focus_position', self.set_focus_position_callback, 1)
-        
+
         # Publishers
         self.pub_imu_correct_angle = self.create_publisher(
             EularAngle, "/imu_correct_angle", 1)
         self.telemetry_pub = self.create_publisher(
             Point, '/gimbalTelemetry', 1)
-        
+
         # Services
         self.focus_control_service = self.create_service(
             SetFocusPosition, 'set_focus_position_srv', self.set_focus_position_service)
@@ -118,6 +122,39 @@ class GimbalController(GimbalBase):
             SetBool, 'set_active_track', self.set_active_track_service)
         self.speed_service = self.create_service(
             SendJointSpeed, 'send_joint_speed_cmd', self.send_joint_speed_cmd)
+
+        self.get_logger().info(
+            f'\033[92m[GIMBAL CTRL] Configured — subscriptions and services ready\033[0m')
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_activate(self, state):
+        ret = super().on_activate(state)
+        if ret != TransitionCallbackReturn.SUCCESS:
+            return ret
+        # Start control loop and initialise gimbal
+        self.timer = self.create_timer(0.1, self.controller_callback)
+        self.set_hyperparams()
+        self.get_logger().info(
+            f'\033[92m[GIMBAL CTRL] Active — control loop started at 10Hz\033[0m')
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_deactivate(self, state):
+        # Stop timer and return gimbal to neutral
+        if hasattr(self, 'timer') and self.timer:
+            self.timer.cancel()
+            self.timer = None
+        self.setPosControl(0, 0, 0)
+        self.get_logger().info(
+            f'\033[93m[GIMBAL CTRL] Deactivated — gimbal returned to 0,0,0\033[0m')
+        return super().on_deactivate(state)
+
+    def on_cleanup(self, state):
+        if hasattr(self, 'timer') and self.timer:
+            self.timer.cancel()
+            self.timer = None
+        self.get_logger().info(
+            f'\033[93m[GIMBAL CTRL] Cleaned up\033[0m')
+        return super().on_cleanup(state)
 
     def img_data_callback(self, msg):
         self.img_data = msg
@@ -158,14 +195,24 @@ class GimbalController(GimbalBase):
         return [roll, pitch, yaw]
 
     def print_status_func(self):
-        deg_roll = self.roll / math.pi * 180.0
-        deg_pitch = self.pitch / math.pi * 180.0
-        deg_yaw = self.yaw / math.pi * 180.0
-        
-        self.get_logger().info(
-            f"Position: roll:{deg_roll:.3f}, pitch:{deg_pitch:.3f}, yaw:{deg_yaw:.3f}"
-        )
-
+        if self.can_is_alive():
+            deg_roll  = self.roll  / math.pi * 180.0
+            deg_pitch = self.pitch / math.pi * 180.0
+            deg_yaw   = self.yaw   / math.pi * 180.0
+            self.get_logger().info(
+                f'{self._C_GREEN}[GIMBAL OK]{self._C_RESET} '
+                f'roll:{deg_roll:7.2f}°  '
+                f'pitch:{deg_pitch:7.2f}°  '
+                f'yaw:{deg_yaw:7.2f}°'
+            )
+        else:
+            now = self.get_clock().now().nanoseconds / 1e9
+            if now - self._last_no_can_warn_time >= 2.0:
+                self._last_no_can_warn_time = now
+                self.get_logger().warn(
+                    f'{self._C_RED}[GIMBAL NO CAN]{self._C_RESET} '
+                    f'No data from gimbal — check can3 cable and gimbal power'
+                )
     def check_limit(self, angle, min_angle, max_angle):
         if angle > max_angle:
             return max_angle
@@ -391,16 +438,22 @@ class GimbalController(GimbalBase):
         return True
 
     def controller_callback(self):
-        self.request_current_position()
-        self.publish_current_position()
-        
+        if self.can_is_alive():
+            self.request_current_position()
+            self.publish_current_position()
+        else:
+            # Still send position request to detect when gimbal comes online
+            self.request_current_position()
+
         if self.print_status_checker:
             self.print_status_func()
-        
+            
         # Check if reached target and handle multi-step movement
-        if self.reach_target_angle():
+        if self.can_is_alive() and self.reach_target_angle():
             if self.last_gimbal_cmd is not None:
-                self.get_logger().info("Reached intermediate, proceeding to final")
+                self.get_logger().info(
+                    f'{self._C_CYAN}[GIMBAL]{self._C_RESET} '
+                    f'Reached intermediate — proceeding to final target')
                 final_cmd = self.last_gimbal_cmd
                 self.last_gimbal_cmd = None
                 self.request_target_position(final_cmd)
@@ -409,14 +462,15 @@ class GimbalController(GimbalBase):
 def main(args=None):
     rclpy.init(args=args)
     node = GimbalController()
-    
+
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":

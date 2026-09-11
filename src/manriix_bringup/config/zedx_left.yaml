@@ -1,0 +1,38 @@
+# ============================================================================
+# Manriix — ZED X Left Camera (secondary, no IMU output)
+#
+# Provides additional stereo pair to cuVSLAM for wider visual coverage.
+# IMU on this camera is unused — cuVSLAM only fuses one IMU (the front).
+# ============================================================================
+
+/**:
+  ros__parameters:
+    general:
+      grab_resolution: 'SVGA'
+      grab_frame_rate: 15
+      pub_frame_rate: 15.0
+      camera_name: 'zedx_left'
+      camera_model: 'zedx'
+      serial_number: 40487925
+
+    video:
+      publish_left_right: true
+      publish_gray: true
+
+    depth:
+      depth_mode: 'NONE'
+
+    pos_tracking:
+      pos_tracking_enabled: false
+      publish_tf: false
+      publish_map_tf: false
+
+    sensors:
+      sensors_image_sync: false
+      publish_imu_tf: false
+
+    object_detection:
+      od_enabled: false
+
+    body_tracking:
+      bt_enabled: false

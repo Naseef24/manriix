@@ -1,0 +1,39 @@
+/oak:
+  ros__parameters:
+    camera:
+      i_nn_type: spatial
+    nn:
+      i_nn_family: mobilenet
+      i_enable_passthrough: true
+    rgb:
+      i_fps: 15.0
+      i_publish_topic: false
+      i_enable_preview: true
+      i_keep_preview_aspect_ratio: false   # squash FULL 127° FOV into the 300x300 NN input (no crop)
+    stereo:                                 # ONE stereo block — keys merged
+      i_align_depth: true
+      i_board_socket_id: 0
+      i_subpixel: true                      # restores fine depth resolution
+      i_width: 640
+      i_height: 400
+
+
+
+# /oak:
+#   ros__parameters:
+#     camera:
+#       i_nn_type: spatial
+#     nn:
+#       i_nn_family: mobilenet
+#       i_enable_passthrough: true
+#     stereo:
+#       i_align_depth: true
+#       i_board_socket_id: 0    # CAM_A / RGB -- must match the NN socket
+#       i_subpixel: true
+#     rgb:
+#       i_fps: 15.0
+#       i_publish_topic: false        # we only need camera_info + NN, not RGB frames
+#     stereo:
+#       i_width: 640
+#       i_height: 400                  # quarter the depth pixels ≈ quarter the pointcloud cost
+#       i_low_bandwidth: true      

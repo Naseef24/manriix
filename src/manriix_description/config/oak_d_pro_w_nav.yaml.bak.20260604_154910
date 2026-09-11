@@ -1,0 +1,53 @@
+# ============================================================================
+# Manriix OAK-D Pro W Configuration — RGB-D mode for cuVSLAM
+#
+# Adapted from Luxonis's official depthai_ros_driver configs:
+#   - config/isaac_vslam.yaml   (Luxonis-tested for Isaac VSLAM consumption)
+#   - config/oak_d_pro_w.yaml   (OAK-D Pro W model defaults)
+#   - config/rgbd.yaml          (RGB-D pipeline template)
+#
+# Goal: publish synchronized RGB + aligned depth + IMU for cuVSLAM RGB-D mode.
+#       tracking_mode: 2 in cuVSLAM consumes this.
+#
+# Critical fix: BOTH rgb.i_fps AND stereo.i_fps must be set to the same value,
+# otherwise cuVSLAM discards weakly-synced depth-image pairs (NVIDIA's official
+# warning for cameras without hardware sync, applies to OAK-D Pro W).
+#
+# File: /home/hype/manriix2_ws/src/manriix_description/config/oak_d_pro_w_nav.yaml
+# ============================================================================
+/oak_d_pro_w:
+  ros__parameters:
+    camera:
+      i_nn_type: none                  # No neural network — keep it lightweight
+      i_pipeline_type: RGBD            # RGB-D pipeline (color + aligned depth)
+      i_enable_imu: true               # Enable BNO086 IMU for cuVSLAM IMU fusion
+      i_enable_ir: false               # IR projector off — venue lighting is fine
+      i_publish_tf_from_calibration: false
+
+    rgb:
+      i_resolution: '720'              # 1280x720 — matches stereo, halves bandwidth vs 1080
+      i_fps: 15.0                      # MUST match stereo.i_fps for cuVSLAM sync
+      i_publish_topic: true
+      i_enable_preview: false
+
+    stereo:
+      i_align_depth: true              # CRITICAL — depth aligned to RGB optical frame
+      i_subpixel: true                 # Sub-pixel disparity for better depth quality
+      i_board_socket_id: 0             # Output socket (matches RGB)
+      i_fps: 15.0                      # MUST match rgb.i_fps for cuVSLAM sync
+      i_min_depth: 200                 # 200mm = 20cm closest depth
+      i_max_depth: 7000                # 7m max (was 5m — extend for venue navigation)
+      i_low_bandwidth: false
+      i_output_disparity: false        # Don't publish disparity, only depth
+      i_publish_synced_rect_pair: false  # Not needed in RGB-D mode (stereo mode only)
+
+    # Left/right mono cameras still capture (needed by stereo block to compute depth)
+    # but we don't publish their topics individually (we use the depth output instead)
+    left:
+      i_resolution: '720'              # Match RGB resolution for consistent FOV
+      i_fps: 15.0
+      i_publish_topic: false           # Don't publish — only used internally for depth
+    right:
+      i_resolution: '720'
+      i_fps: 15.0
+      i_publish_topic: false

@@ -1,0 +1,397 @@
+# # Parameters mirror the paper's notation (Eppenberger et al., IROS 2020),
+# # defaults taken from Section IV-A "Experimental Setup".
+# #
+# # NOTE: their setup used a narrower-FOV stereo pair on a Jackal at ~waist
+# # height; you may need to retune l_g/l_h/l_d for the OAK-D Pro W's mount
+# # height/FOV once you're looking at real data in Step 1.
+
+# pointcloud_filter_node:
+#   ros__parameters:
+#     input_topic: /oak/points
+#     output_dense_topic: /manriix/points_dense
+#     output_filtered_topic: /manriix/points_filtered
+#     target_frame: base_footprint
+
+#     l_d: 3.0     # depth trust limit [m]
+#     l_g: 0.1    # ground crop height [m]
+#     l_h: 1.0     # ceiling crop height [m]
+#     l_l: 0.05    # voxel leaf size [m]
+#     l_n: 30      # min neighbors (radius outlier filter)
+#     l_r: 0.5     # radius [m] (radius outlier filter)
+
+# cluster_tracking_node:
+#   ros__parameters:
+#     input_topic: /manriix/points_filtered
+#     output_tracks_topic: /manriix/cluster_tracks
+#     output_markers_topic: /manriix/cluster_markers
+ 
+#     dbscan_eps: 0.3            # [m] neighborhood radius
+#     dbscan_min_samples: 15     # min points to form a dense region
+#     min_cluster_points: 15     # discard clusters smaller than this
+ 
+#     track_max_assoc_dist: 0.6  # [m] GNN association gate
+#     track_timeout: 1.0         # [s] keep unmatched (occluded) tracks alive this long    
+
+
+# Parameters mirror the paper's notation (Eppenberger et al., IROS 2020),
+# defaults taken from Section IV-A "Experimental Setup", then tuned on
+# real OAK-D Pro W data.
+
+# pointcloud_filter_node:
+#   ros__parameters:
+#     input_topic: /oak/points
+#     output_dense_topic: /manriix/points_dense
+#     output_filtered_topic: /manriix/points_filtered
+#     target_frame: base_footprint
+
+#     l_d: 3.0     # depth trust limit [m]
+#     l_g: 0.1     # ground crop height [m], near-field base margin
+#     l_h: 1.0     # ceiling crop height [m]
+#     l_l: 0.05    # voxel leaf size [m]
+#     l_n: 30      # min neighbors (radius outlier filter)
+#     l_r: 0.5     # radius [m] (radius outlier filter)
+
+#     # Range-adaptive ground margin: l_g_eff(z) = l_g + ground_margin_k * sigma_z(z)
+#     # sigma_z(z) = z^2 * disparity_sigma_px / (focal_px * baseline_m)
+#     focal_px: 772.0
+#     baseline_m: 0.075
+#     disparity_sigma_px: 0.5
+#     ground_margin_k: 3.0
+
+# cluster_tracking_node:
+#   ros__parameters:
+#     input_topic: /manriix/points_filtered
+#     output_tracks_topic: /manriix/cluster_tracks
+#     output_markers_topic: /manriix/cluster_markers
+
+#     dbscan_eps: 0.3            # [m] neighborhood radius
+#     dbscan_min_samples: 15     # min points to form a dense region
+#     min_cluster_points: 15     # discard clusters smaller than this
+
+#     track_max_assoc_dist: 0.6  # [m] GNN association gate
+#     track_timeout: 1.0         # [s] keep unmatched (occluded) tracks alive this long
+#     min_hits_to_confirm: 3     # consecutive matched frames before a track is published/drawn
+
+# static_dynamic_classifier_node:
+#   ros__parameters:
+#     dense_topic: /manriix/points_dense
+#     tracks_topic: /manriix/cluster_tracks
+#     camera_info_topic: /oak/right/camera_info
+#     camera_frame: oak_right_camera_optical_frame
+#     map_frame: base_footprint
+
+#     output_tracks_topic: /manriix/cluster_tracks_classified
+#     output_markers_topic: /manriix/classification_markers
+
+#     delta: 0.4          # [s] frame separation for voting (paper Sec IV-A)
+#     tau: 0.4             # [s] consistency horizon
+#     l_NN: 0.45           # [m/s] velocity threshold
+#     l_abs_dyn: 100       # absolute dynamic-vote-count threshold
+#     l_rel_dyn: 0.8        # relative dynamic-vote-fraction threshold
+
+#     occlusion_pixel_radius: 4.0    # [px]
+#     occlusion_depth_margin: 0.05   # [m]
+#     buffer_horizon: 1.5            # [s] history retained for lookback
+
+# Parameters mirror the paper's notation (Eppenberger et al., IROS 2020),
+# defaults taken from Section IV-A "Experimental Setup", then tuned on
+# real OAK-D Pro W data.
+
+# Parameters mirror the paper's notation (Eppenberger et al., IROS 2020),
+# defaults taken from Section IV-A "Experimental Setup", then tuned on
+# real OAK-D Pro W data.
+
+# pointcloud_filter_node:
+#   ros__parameters:
+#     input_topic: /oak/points
+#     output_dense_topic: /manriix/points_dense
+#     output_filtered_topic: /manriix/points_filtered
+#     target_frame: base_footprint
+
+#     l_d: 3.0     # depth trust limit [m]
+#     l_g: 0.1     # ground crop height [m], near-field base margin
+#     l_h: 1.0     # ceiling crop height [m]
+#     l_l: 0.05    # voxel leaf size [m]
+#     l_n: 30      # min neighbors (radius outlier filter)
+#     l_r: 0.5     # radius [m] (radius outlier filter)
+
+#     # Range-adaptive ground margin: l_g_eff(z) = l_g + ground_margin_k * sigma_z(z)
+#     # sigma_z(z) = z^2 * disparity_sigma_px / (focal_px * baseline_m)
+#     focal_px: 772.0
+#     baseline_m: 0.075
+#     disparity_sigma_px: 0.5
+#     ground_margin_k: 3.0
+
+# cluster_tracking_node:
+#   ros__parameters:
+#     input_topic: /manriix/points_filtered
+#     output_tracks_topic: /manriix/cluster_tracks
+#     output_markers_topic: /manriix/cluster_markers
+
+#     dbscan_eps: 0.3            # [m] neighborhood radius
+#     dbscan_min_samples: 15     # min points to form a dense region
+#     min_cluster_points: 15     # discard clusters smaller than this
+
+#     track_max_assoc_dist: 0.6  # [m] GNN association gate
+#     track_timeout: 1.0         # [s] keep unmatched (occluded) tracks alive this long
+#     min_hits_to_confirm: 3     # consecutive matched frames before a track is published/drawn
+
+# static_dynamic_classifier_node:
+#   ros__parameters:
+#     dense_topic: /manriix/points_dense
+#     tracks_topic: /manriix/cluster_tracks
+#     camera_info_topic: /oak/right/camera_info
+#     camera_frame: oak_right_camera_optical_frame
+#     map_frame: base_footprint
+
+#     output_tracks_topic: /manriix/cluster_tracks_classified
+#     output_markers_topic: /manriix/classification_markers
+
+#     delta: 0.4          # [s] frame separation for voting (paper Sec IV-A)
+#     tau: 0.4             # [s] consistency horizon
+#     l_NN: 0.45           # [m/s] velocity threshold
+#     l_abs_dyn: 100       # absolute dynamic-vote-count threshold
+#     l_rel_dyn: 0.8        # relative dynamic-vote-fraction threshold
+
+#     occlusion_pixel_radius: 4.0    # [px]
+#     occlusion_depth_margin: 0.05   # [m]
+#     buffer_horizon: 1.5            # [s] history retained for lookback
+
+# people_tracker_node:
+#   ros__parameters:
+#     detections_topic: /oak/nn/spatial_detections
+#     output_topic: /manriix/person_boxes
+#     target_frame: base_footprint
+#     confidence_threshold: 0.5
+#     max_assoc_dist: 0.7        # [m] 3D association gate
+#     box_timeout: 0.7
+#     min_hits_to_confirm: 2
+
+
+# Parameters mirror the paper's notation (Eppenberger et al., IROS 2020),
+# defaults taken from Section IV-A "Experimental Setup", then tuned on
+# real OAK-D Pro W data.
+
+# pointcloud_filter_node:
+#   ros__parameters:
+#     input_topic: /oak/points
+#     output_dense_topic: /manriix/points_dense
+#     output_filtered_topic: /manriix/points_filtered
+#     target_frame: base_footprint
+
+#     l_d: 3.0     # depth trust limit [m]
+#     l_g: 0.1     # ground crop height [m], near-field base margin
+#     l_h: 1.0     # ceiling crop height [m]
+#     l_l: 0.05    # voxel leaf size [m]
+#     l_n: 8 #30      # min neighbors (radius outlier filter)
+#     l_r: 0.15 #0.5     # radius [m] (radius outlier filter)
+
+#     # Range-adaptive ground margin: l_g_eff(z) = l_g + ground_margin_k * sigma_z(z)
+#     # sigma_z(z) = z^2 * disparity_sigma_px / (focal_px * baseline_m)
+#     focal_px: 386.0 #772.0
+#     baseline_m: 0.075
+#     disparity_sigma_px: 0.5
+#     ground_margin_k: 3.0
+
+# cluster_tracking_node:
+#   ros__parameters:
+#     input_topic: /manriix/points_filtered
+#     output_tracks_topic: /manriix/cluster_tracks
+#     output_markers_topic: /manriix/cluster_markers
+
+#     dbscan_eps: 0.3            # [m] neighborhood radius
+#     dbscan_min_samples: 15     # min points to form a dense region
+#     min_cluster_points: 15     # discard clusters smaller than this
+
+#     track_max_assoc_dist: 0.6  # [m] GNN association gate
+#     track_timeout: 1.0         # [s] keep unmatched (occluded) tracks alive this long
+#     min_hits_to_confirm: 3     # consecutive matched frames before a track is published/drawn
+
+# static_dynamic_classifier_node:
+#   ros__parameters:
+#     dense_topic: /manriix/points_dense
+#     tracks_topic: /manriix/cluster_tracks
+#     camera_info_topic: /oak/stereo/camera_info
+#     camera_frame: oak_rgb_camera_optical_frame
+#     map_frame: base_footprint
+
+#     output_tracks_topic: /manriix/cluster_tracks_classified
+#     output_markers_topic: /manriix/classification_markers
+
+#     delta: 0.4          # [s] frame separation for voting (paper Sec IV-A)
+#     tau: 0.4             # [s] consistency horizon
+#     l_NN: 0.45           # [m/s] velocity threshold
+#     l_abs_dyn: 100       # absolute dynamic-vote-count threshold
+#     l_rel_dyn: 0.8        # relative dynamic-vote-fraction threshold
+
+#     occlusion_pixel_radius: 4.0    # [px]
+#     occlusion_depth_margin: 0.05   # [m]
+#     buffer_horizon: 1.5            # [s] history retained for lookback
+
+# people_tracker_node:
+#   ros__parameters:
+#     detections_topic: /oak/nn/spatial_detections
+#     output_topic: /manriix/person_boxes
+#     target_frame: base_footprint
+#     confidence_threshold: 0.5
+#     max_assoc_dist: 0.7        # [m] 3D association gate
+#     box_timeout: 0.7
+#     min_hits_to_confirm: 2
+
+# fusion_node:
+#   ros__parameters:
+#     tracks_topic: /manriix/cluster_tracks_classified
+#     person_boxes_topic: /manriix/person_boxes
+#     output_tracks_topic: /manriix/cluster_tracks_fused
+#     output_markers_topic: /manriix/fusion_markers
+
+#     gamma: 1.5             # [1/s] association frequency threshold (paper Sec IV-A)
+#     freq_window: 2.0        # [s] window for measuring f_a
+#     assoc_gate_xy: 0.7      # [m] person<->cluster association gate (x-y plane)
+#     person_label_hold: 1.5  # [s] keep 'person' after last association
+
+# motion_estimation_node:
+#   ros__parameters:
+#     tracks_topic: /manriix/cluster_tracks_fused
+#     output_tracks_topic: /manriix/objects
+#     output_markers_topic: /manriix/motion_markers
+#     q_pos: 0.05
+#     q_vel: 0.5
+#     r_meas: 0.02
+#     lost_keepalive: 2.0
+#     reassoc_mahalanobis: 3.0
+#     min_speed_arrow: 0.15    
+
+# occupancy_grid_node:
+#   ros__parameters:
+#     tracks_topic: /manriix/objects
+#     map_frame: map
+#     base_frame: base_footprint
+#     grid_size: 8.0
+#     resolution: 0.05
+#     inflate_cells: 2
+#     predict_horizon: 1.0
+#     predict_steps: 5
+#     static_hit: 30
+#     static_decay: 2
+#     static_max: 100
+#     static_occupied_thresh: 50    
+
+
+# Parameters mirror the paper's notation (Eppenberger et al., IROS 2020),
+# defaults taken from Section IV-A "Experimental Setup", then tuned on
+# real OAK-D Pro W data.
+
+pointcloud_filter_node:
+  ros__parameters:
+    input_topic: /oak/points
+    output_dense_topic: /manriix/points_dense
+    output_filtered_topic: /manriix/points_filtered
+    target_frame: base_footprint
+
+    l_d: 5.0 #5.0     # depth trust limit [m]
+    l_g: 0.03     # ground crop height [m], near-field base margin
+    l_h: 1.0     # ceiling crop height [m]
+    l_l: 0.05    # voxel leaf size [m]
+    l_n: 30      # min neighbors (radius outlier filter)
+    l_r: 0.5     # radius [m] (radius outlier filter)
+
+    # Range-adaptive ground margin: l_g_eff(z) = l_g + ground_margin_k * sigma_z(z)
+    # sigma_z(z) = z^2 * disparity_sigma_px / (focal_px * baseline_m)
+    # focal_px: 772.0
+    focal_px: 428.9 #<k[0] value>   # 386 if stereo is 640x400, 772 if 1280x720
+    baseline_m: 0.075
+    disparity_sigma_px: 0.5
+    ground_margin_k: 3.0
+
+cluster_tracking_node:
+  ros__parameters:
+    input_topic: /manriix/points_filtered
+    output_tracks_topic: /manriix/cluster_tracks
+    output_markers_topic: /manriix/cluster_markers
+
+    dbscan_eps: 0.3            # [m] neighborhood radius
+    dbscan_min_samples: 15     # min points to form a dense region
+    min_cluster_points: 15     # discard clusters smaller than this
+
+    track_max_assoc_dist: 0.6  # [m] GNN association gate
+    track_timeout: 1.0         # [s] keep unmatched (occluded) tracks alive this long
+    min_hits_to_confirm: 3     # consecutive matched frames before a track is published/drawn
+
+static_dynamic_classifier_node:
+  ros__parameters:
+    dense_topic: /manriix/points_dense
+    tracks_topic: /manriix/cluster_tracks
+    camera_info_topic: /oak/stereo/camera_info #/oak/right/camera_info
+    camera_frame: oak_rgb_camera_optical_frame #oak_d_pro_w_rgb_camera_optical_frame #oak_right_camera_optical_frame
+    map_frame: base_footprint
+
+    output_tracks_topic: /manriix/cluster_tracks_classified
+    output_markers_topic: /manriix/classification_markers
+
+    delta: 0.4          # [s] frame separation for voting (paper Sec IV-A)
+    tau: 0.6 #0.4             # [s] consistency horizon
+    l_NN: 0.45 #    0.35       # [m/s] velocity threshold
+    l_abs_dyn: 100 #40       # absolute dynamic-vote-count threshold
+    l_rel_dyn: 0.7 #0.8 #0.35        # relative dynamic-vote-fraction threshold
+
+    occlusion_pixel_radius: 4.0    # [px]
+    occlusion_depth_margin: 0.05   # [m]
+    buffer_horizon: 1.5            # [s] history retained for lookback
+    max_proj_points: 6000          # dense-cloud subsample for occlusion depth map
+
+people_tracker_node:
+  ros__parameters:
+    detections_topic: /oak/nn/spatial_detections
+    output_topic: /manriix/person_boxes
+    target_frame: base_footprint
+    confidence_threshold: 0.5
+    max_assoc_dist: 0.7        # [m] 3D association gate
+    box_timeout: 0.7
+    min_hits_to_confirm: 2
+    publish_debug_image: true
+    image_topic: /oak/nn/passthrough/image_raw
+    debug_image_topic: /manriix/detection_image
+
+fusion_node:
+  ros__parameters:
+    tracks_topic: /manriix/cluster_tracks_classified
+    person_boxes_topic: /manriix/person_boxes
+    output_tracks_topic: /manriix/cluster_tracks_fused
+    output_markers_topic: /manriix/fusion_markers
+
+    gamma: 1.5             # [1/s] association frequency threshold (paper Sec IV-A)
+    freq_window: 2.0        # [s] window for measuring f_a
+    assoc_gate_xy: 0.7      # [m] person<->cluster association gate (x-y plane)
+    person_label_hold: 1.5  # [s] keep 'person' after last association
+
+motion_estimation_node:
+  ros__parameters:
+    tracks_topic: /manriix/cluster_tracks_fused
+    output_tracks_topic: /manriix/objects
+    output_markers_topic: /manriix/motion_markers
+
+    q_pos: 0.05             # KF process noise, position
+    q_vel: 0.5               # KF process noise, velocity
+    r_meas: 0.02             # KF measurement noise (centroid jitter)
+
+    lost_keepalive: 2.0        # [s] keep predicting lost objects
+    reassoc_mahalanobis: 3.0   # re-association gate
+    min_speed_arrow: 0.15      # [m/s] min speed to draw velocity arrow
+
+occupancy_grid_node:
+  ros__parameters:
+    tracks_topic: /manriix/objects
+    map_frame: map
+    base_frame: base_footprint
+
+    grid_size: 8.0          # [m]
+    resolution: 0.05         # [m/cell]
+    inflate_cells: 2
+
+    predict_horizon: 1.0     # [s] sweep dynamic costs along velocity
+    predict_steps: 5
+    static_hit: 30
+    static_decay: 2
+    static_max: 100
+    static_occupied_thresh: 50

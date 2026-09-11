@@ -52,8 +52,21 @@ class PositionEvaluator:
 
             ## Scoring
             # 1. Distance score
-            distance = np.linalg.norm(pos_2d - robot_2d)
-            distance_score = 1.0 / (1.0 + 0.1 * distance)
+            # distance = np.linalg.norm(pos_2d - robot_2d)
+            # distance_score = 1.0 / (1.0 + 0.1 * distance)
+
+            # 1a. Travel cost — how far robot needs to move (low weight)
+            travel_distance = np.linalg.norm(pos_2d - robot_2d)
+            travel_score = 1.0 / (1.0 + 0.15 * travel_distance)
+
+            # 1b. Photo quality distance — how close to optimal photo distance from cluster
+            cluster_center = position.get('cluster_center', pos_2d)
+            if not isinstance(cluster_center, np.ndarray):
+                cluster_center = np.array(cluster_center)
+            cluster_center_2d = cluster_center[:2] if len(cluster_center) > 2 else cluster_center
+            photo_distance = np.linalg.norm(pos_2d - cluster_center_2d)
+            optimal_photo_d = 3.5  # metres — photo_distance_optimal
+            photo_quality_score = max(0.0, 1.0 - abs(photo_distance - optimal_photo_d) / optimal_photo_d)
 
             # 2. Size score
             size_score = position['cluster_size'] / 10.0
@@ -102,12 +115,18 @@ class PositionEvaluator:
 
             ### FINAL SCORE
             final_score = (
-                self.weights.get('distance', 0.1) * distance_score +
+                # self.weights.get('distance', 0.1) * distance_score +
+                # 0.08 * travel_score +
+                0.05 * travel_score +          # was 0.08
+                # 0.22 * photo_quality_score +
+                0.20 * photo_quality_score +   # was 0.22
                 self.weights.get('size', 0.1) * size_score +
                 self.weights.get('density', 0.1) * density_score +
                 self.weights.get('formation', 0.1) * formation_score +
                 self.weights.get('stability', 0.1) * stability_score +
-                self.weights.get('composition', 0.1) * composition_score +
+                # self.weights.get('composition', 0.1) * composition_score +
+                # 0.05 * composition_score +
+                0.04 * composition_score +     # was 0.05
                 self.weights.get('obstacle_proximity', 0.1) * obstacle_proximity_score +
                 self.weights.get('environment_complexity', 0.1) * environment_complexity_score +
                 self.weights.get('path_feasibility', 0.1) * path_feasibility_score +

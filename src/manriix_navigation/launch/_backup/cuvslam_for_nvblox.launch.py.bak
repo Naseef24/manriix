@@ -1,0 +1,413 @@
+#!/usr/bin/env python3
+"""
+================================================================================
+Manriix cuVSLAM + nvblox + Nav2 — Single-terminal launch
+
+This file brings up the entire perception + navigation stack:
+  - Isaac ROS cuVSLAM (visual_slam node) — 3× ZED X, 6 stereo images + IMU
+  - Isaac ROS nvblox (nvblox_node) — 3D voxel mapping from front ZED depth
+  - Nav2 stack — planner, controller, behaviors, lifecycle manager
+
+cuVSLAM publishes BOTH map->odom AND odom->base_footprint transforms.
+nvblox reads pose from tf and publishes /nvblox_node/static_map_slice.
+Nav2 consumes nvblox slice via nvblox::nav2::NvbloxCostmapLayer + RPLidar.
+
+Prerequisites (must be running before this launch):
+  - robot_nav_nvblox.launch.py — cameras (front depth ON) + URDF + controllers
+
+Launch:
+  ros2 launch manriix_navigation cuvslam_for_nvblox.launch.py
+
+RViz is launched separately, NOT from this file:
+  rviz2 -d ~/manriix2_ws/src/manriix_navigation/rviz/nvblox.rviz
+
+File: /home/hype/manriix2_ws/src/manriix_navigation/launch/cuvslam_for_nvblox.launch.py
+================================================================================
+"""
+
+import os
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import (
+    DeclareLaunchArgument, IncludeLaunchDescription, LogInfo,
+    SetEnvironmentVariable, TimerAction
+)
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
+from launch.conditions import IfCondition
+from launch_ros.actions import Node
+
+
+# Mandatory GXF library path — without this, isaac_ros_visual_slam and nvblox
+# die with "libgxf_serialization.so: cannot open shared object file" on launch.
+GXF_LIB_PATH = (
+    '/opt/ros/humble/share/isaac_ros_gxf/gxf/lib/serialization:'
+    '/opt/ros/humble/share/isaac_ros_gxf/gxf/lib/std:'
+    '/opt/ros/humble/share/isaac_ros_gxf/gxf/lib/cuda:'
+    '/opt/ros/humble/share/isaac_ros_gxf/gxf/lib/logger:'
+    '/opt/ros/humble/share/isaac_ros_gxf/gxf/lib/ipc/grpc'
+)
+
+
+def generate_launch_description():
+    nav_pkg = get_package_share_directory('manriix_navigation')
+    nav2_bringup_pkg = get_package_share_directory('nav2_bringup')
+
+    nav2_params_nvblox_path = os.path.join(
+        nav_pkg, 'config', 'nav2', 'nav2_params_nvblox.yaml'
+    )
+
+    ld = LaunchDescription()
+
+    # ── Environment ─────────────────────────────────────────────────────────
+    ld.add_action(SetEnvironmentVariable('RCUTILS_COLORIZED_OUTPUT', '1'))
+    ld.add_action(SetEnvironmentVariable(
+        'RCUTILS_CONSOLE_OUTPUT_FORMAT', '[{severity}] [{name}]: {message}'))
+    ld.add_action(SetEnvironmentVariable(
+        name='LD_LIBRARY_PATH',
+        value=[GXF_LIB_PATH + ':', os.environ.get('LD_LIBRARY_PATH', '')]
+    ))
+
+    # ── Launch arguments ────────────────────────────────────────────────────
+    ld.add_action(DeclareLaunchArgument('use_sim_time', default_value='false'))
+    ld.add_action(DeclareLaunchArgument('enable_imu_fusion', default_value='true'))
+    ld.add_action(DeclareLaunchArgument(
+        'enable_localization_n_mapping', default_value='true'))
+
+    ld.add_action(DeclareLaunchArgument(
+        'publish_map_tf', default_value='true',
+        description='cuVSLAM publishes map->odom (TRUE because no SLAM Toolbox).'))
+    ld.add_action(DeclareLaunchArgument(
+        'publish_odom_tf', default_value='true',
+        description='cuVSLAM publishes odom->base_footprint.'))
+
+    ld.add_action(DeclareLaunchArgument('base_frame', default_value='base_footprint'))
+    ld.add_action(DeclareLaunchArgument('odom_frame', default_value='odom'))
+    ld.add_action(DeclareLaunchArgument('map_frame', default_value='map'))
+    ld.add_action(DeclareLaunchArgument('imu_frame', default_value='zedx_front_imu_link'))
+    ld.add_action(DeclareLaunchArgument('rectified_images', default_value='true'))
+    ld.add_action(DeclareLaunchArgument('image_qos', default_value='SENSOR_DATA'))
+
+    # nvblox + Nav2 args
+    ld.add_action(DeclareLaunchArgument(
+        'nav2_params_file', default_value=nav2_params_nvblox_path,
+        description='Nav2 parameters file (nvblox-aware costmaps)'))
+    ld.add_action(DeclareLaunchArgument(
+        'use_nav2', default_value='true',
+        description='Launch the full Nav2 stack. Disable to test cuVSLAM+nvblox alone.'))
+    ld.add_action(DeclareLaunchArgument(
+        'voxel_size', default_value='0.05',
+        description='nvblox voxel size in meters. 0.05 = 5cm.'))
+    ld.add_action(DeclareLaunchArgument(
+        'nvblox_delay', default_value='3.0',
+        description='Delay before launching nvblox (seconds). Gives cuVSLAM '
+                    'time to start publishing tf so nvblox can resolve frames.'))
+    ld.add_action(DeclareLaunchArgument(
+        'nav2_delay', default_value='5.0',
+        description='Delay before launching Nav2 (seconds). After nvblox.'))
+
+    use_sim_time = LaunchConfiguration('use_sim_time')
+    enable_imu_fusion = LaunchConfiguration('enable_imu_fusion')
+    enable_localization_n_mapping = LaunchConfiguration('enable_localization_n_mapping')
+    publish_map_tf = LaunchConfiguration('publish_map_tf')
+    publish_odom_tf = LaunchConfiguration('publish_odom_tf')
+    base_frame = LaunchConfiguration('base_frame')
+    odom_frame = LaunchConfiguration('odom_frame')
+    map_frame = LaunchConfiguration('map_frame')
+    imu_frame = LaunchConfiguration('imu_frame')
+    rectified_images = LaunchConfiguration('rectified_images')
+    image_qos = LaunchConfiguration('image_qos')
+    nav2_params_file = LaunchConfiguration('nav2_params_file')
+    use_nav2 = LaunchConfiguration('use_nav2')
+    voxel_size = LaunchConfiguration('voxel_size')
+    nvblox_delay = LaunchConfiguration('nvblox_delay')
+    nav2_delay = LaunchConfiguration('nav2_delay')
+
+    ld.add_action(LogInfo(msg='\n' + '=' * 64 + '\n'
+        '[MANRIIX cuVSLAM + nvblox + Nav2 — single-terminal launch]\n'
+        '  Cameras: 3 ZED X (front + IMU + 2 sides)\n'
+        '  cuVSLAM owns BOTH map->odom and odom->base_footprint\n'
+        '  nvblox: front depth -> 3D voxel map -> /nvblox_node/static_map_slice\n'
+        '  Nav2: nvblox slice + RPLidar -> costmaps -> /cmd_vel\n' +
+        '=' * 64))
+
+    # ──────────────────────────────────────────────────────────────────────
+    # cuVSLAM node — starts immediately
+    # ──────────────────────────────────────────────────────────────────────
+    camera_optical_frames = [
+        'zedx_front_left_camera_frame_optical',
+        'zedx_front_right_camera_frame_optical',
+        'zedx_left_left_camera_frame_optical',
+        'zedx_left_right_camera_frame_optical',
+        'zedx_right_left_camera_frame_optical',
+        'zedx_right_right_camera_frame_optical',
+    ]
+
+    remappings_vslam = [
+        ('visual_slam/image_0',       '/zedx_front/zed_node/left/gray/rect/image'),
+        ('visual_slam/camera_info_0', '/zedx_front/zed_node/left/gray/rect/camera_info'),
+        ('visual_slam/image_1',       '/zedx_front/zed_node/right/gray/rect/image'),
+        ('visual_slam/camera_info_1', '/zedx_front/zed_node/right/gray/rect/camera_info'),
+        ('visual_slam/image_2',       '/zedx_left/zed_node/left/gray/rect/image'),
+        ('visual_slam/camera_info_2', '/zedx_left/zed_node/left/gray/rect/camera_info'),
+        ('visual_slam/image_3',       '/zedx_left/zed_node/right/gray/rect/image'),
+        ('visual_slam/camera_info_3', '/zedx_left/zed_node/right/gray/rect/camera_info'),
+        ('visual_slam/image_4',       '/zedx_right/zed_node/left/gray/rect/image'),
+        ('visual_slam/camera_info_4', '/zedx_right/zed_node/left/gray/rect/camera_info'),
+        ('visual_slam/image_5',       '/zedx_right/zed_node/right/gray/rect/image'),
+        ('visual_slam/camera_info_5', '/zedx_right/zed_node/right/gray/rect/camera_info'),
+        ('visual_slam/imu',           '/zedx_front/zed_node/imu/data'),
+    ]
+
+    visual_slam_node = Node(
+        package='isaac_ros_visual_slam',
+        executable='isaac_ros_visual_slam',
+        name='visual_slam',
+        output='screen',
+        parameters=[{
+            'use_sim_time': use_sim_time,
+            'base_frame': base_frame,
+            'odom_frame': odom_frame,
+            'map_frame': map_frame,
+            'imu_frame': imu_frame,
+            'camera_optical_frames': camera_optical_frames,
+            'num_cameras': 6,
+            'multicam_mode': 0,
+            'enable_imu_fusion': enable_imu_fusion,
+            'gyro_noise_density': 0.000244,
+            'gyro_random_walk':   0.000019393,
+            'accel_noise_density': 0.001862,
+            'accel_random_walk':   0.003,
+            'enable_localization_n_mapping': enable_localization_n_mapping,
+            'enable_slam_visualization': True,
+            'enable_observations_view': True,
+            'enable_landmarks_view': True,
+            'publish_map_to_odom_tf': publish_map_tf,
+            'publish_odom_to_base_tf': publish_odom_tf,
+            'invert_map_to_odom_tf': False,
+            'invert_odom_to_base_tf': False,
+            'rectified_images': rectified_images,
+            'enable_image_denoising': False,
+            'image_jitter_threshold_ms': 100.0,
+            'image_qos': image_qos,
+            'imu_qos': 'SENSOR_DATA',
+            'enable_debug_mode': False,
+            'verbosity': 0,
+        }],
+        remappings=remappings_vslam,
+    )
+    ld.add_action(visual_slam_node)
+
+    # ──────────────────────────────────────────────────────────────────────
+    # nvblox node — starts after cuVSLAM has time to publish tf
+    # ──────────────────────────────────────────────────────────────────────
+    # Subscribes to:
+    #   /zedx_front/zed_node/depth/depth_registered     -> camera_0/depth
+    #   /zedx_front/zed_node/depth/camera_info          -> camera_0/depth_info
+    #   /zedx_front/zed_node/left/color/rect/image      -> camera_0/color
+    #   /zedx_front/zed_node/left/color/rect/camera_info -> camera_0/color_info
+    #
+    # Publishes:
+    #   /nvblox_node/static_map_slice          (for Nav2 costmap)
+    #   /nvblox_node/mesh                      (3D mesh viz)
+    #   /nvblox_node/static_esdf_pointcloud
+    #   /nvblox_node/static_occupancy
+    #
+    # IMPORTANT: parameter names below are best-effort against nvblox 3.2.5.
+    # After first launch, verify with: ros2 param list /nvblox_node | sort
+    # ──────────────────────────────────────────────────────────────────────
+    # ──────────────────────────────────────────────────────────────────────
+    # nvblox node — parameters verified against NVIDIA reference 3.2.5:
+    #   /opt/ros/humble/share/nvblox_examples_bringup/config/nvblox/nvblox_base.yaml
+    #   /opt/ros/humble/share/nvblox_examples_bringup/config/nvblox/specializations/nvblox_zed.yaml
+    #
+    # Differences from NVIDIA's nvblox_zed.yaml:
+    #   - map_clearing_frame_id: 'base_footprint' (NVIDIA uses 'zed_camera_link')
+    #     because base_footprint is our URDF navigation root.
+    #   - esdf_slice_min/max_height set to 0.10/0.90 (NVIDIA uses -0.1/0.3
+    #     relative to camera). Our heights are relative to base_footprint
+    #     which is at ground level (Z=0), so 0.10-0.90 means 0.1m to 0.9m
+    #     above the floor — captures torso-height obstacles for venue robot.
+    # ──────────────────────────────────────────────────────────────────────
+    nvblox_node = Node(
+        package='nvblox_ros',
+        executable='nvblox_node',
+        name='nvblox_node',
+        output='screen',
+        parameters=[{
+            'use_sim_time': use_sim_time,
+
+            # ── CUDA & top-level config (from nvblox_base.yaml) ──
+            'cuda_stream_type': 1,           # 1 = blocking async stream
+            'voxel_size': voxel_size,
+            'num_cameras': 1,
+            'use_tf_transforms': True,
+            'mapping_type': 'static_tsdf',
+
+            # ── Processing rates (from nvblox_base.yaml, slightly reduced
+            # for Jetson AGX Orin to balance latency vs GPU load) ──
+            'tick_period_ms': 10,
+            'integrate_depth_rate_hz':  20.0,   # NVIDIA default 40.0
+            'integrate_color_rate_hz':  5.0,    # NVIDIA default 5.0
+            'integrate_lidar_rate_hz':  0.0,    # LiDAR off
+            'update_mesh_rate_hz':      5.0,
+            'update_esdf_rate_hz':      10.0,
+            'publish_layer_rate_hz':    5.0,
+            'publish_debug_vis_rate_hz': 2.0,
+            # ── TSDF decay DISABLED for persistent mapping ──
+            # NVIDIA's default 5.0 causes voxels to fade out of memory
+            # after they leave the camera FOV. For venue mapping where
+            # we drive once and want the WHOLE map preserved, set to 0.0.
+            # Confirmed fix per NVIDIA Isaac ROS forums:
+            # https://forums.developer.nvidia.com/t/isaac-ros-nvblox-mapping/314258
+            # https://forums.developer.nvidia.com/t/nvblox-map-clearing-issue-and-hardware-bottleneck/362215
+            'decay_tsdf_rate_hz':       0.0,
+
+            # ── Console output ──
+            'print_rates_to_console': True,
+            'print_timings_to_console': False,
+            'print_delays_to_console': False,
+            'print_queue_drops_to_console': True,
+            'print_statistics_on_console_period_ms': 10000,
+
+            # ── ESDF mode ──
+            'esdf_mode': '2d',
+            'publish_esdf_distance_slice': True,
+
+            # ── Sensor enable flags (verified against nvblox_zed.yaml) ──
+            'use_color': True,
+            'use_depth': True,
+            'use_lidar': False,                  # explicitly off (we have RPLidar
+                                                 # via Nav2 obstacle layer instead)
+
+            # ── Input queue ──
+            'maximum_input_queue_length': 10,
+
+            # ── Map clearing settings ──
+            # NVIDIA reference uses 7.0 (rolling window — deletes old data).
+            # We want the FULL map preserved as we drive, so disable clearing.
+            # Negative value = no clearing per nvblox_base.yaml comment.
+            'map_clearing_radius_m': -1.0,
+            'map_clearing_frame_id': 'base_footprint',
+
+            # ── QoS (from nvblox_zed.yaml) ──
+            'input_qos': 'SENSOR_DATA',
+
+            # ── Visualization frames (from nvblox_zed.yaml — adapted) ──
+            'esdf_slice_bounds_visualization_attachment_frame_id': 'base_footprint',
+            'esdf_slice_bounds_visualization_side_length': 10.0,
+            'workspace_height_bounds_visualization_attachment_frame_id': 'base_footprint',
+            'workspace_height_bounds_visualization_side_length': 10.0,
+            'layer_visualization_min_tsdf_weight': 0.1,
+            'layer_visualization_exclusion_height_m': 2.0,
+            'layer_visualization_exclusion_radius_m': 7.0,
+            'layer_visualization_undo_gamma_correction': False,
+
+            # ── Depth integration ──
+            'max_back_projection_distance': 7.0,
+            'back_projection_subsampling': 1,
+            'layer_streamer_bandwidth_limit_mbps': -1.0,
+
+            # ── Static mapper sub-params (from nvblox_base.yaml + zed overrides) ──
+            # ── Static mapper decay safety belt ──
+            # Even with decay_tsdf_rate_hz: 0.0, ensure blocks aren't
+            # deallocated. This keeps the map persistent for mapping sessions.
+            'static_mapper.decay_integrator_deallocate_decayed_blocks': False,
+            'static_mapper.exclude_last_view_from_decay': True,
+
+            'static_mapper.do_depth_preprocessing': False,
+            'static_mapper.depth_preprocessing_num_dilations': 3,
+            'static_mapper.projective_integrator_max_integration_distance_m': 5.0,
+            'static_mapper.projective_integrator_truncation_distance_vox': 4.0,
+            'static_mapper.projective_integrator_weighting_mode':
+                'inverse_square_tsdf_distance_penalty',
+            'static_mapper.projective_integrator_max_weight': 5.0,
+            'static_mapper.projective_tsdf_integrator_invalid_depth_decay_factor': -1.0,
+
+            # ── ESDF slice (Manriix-specific override) ──
+            # Heights relative to base_footprint (ground level).
+            # 0.10 to 0.90: captures table edges, chair backs, torsos.
+            'static_mapper.esdf_slice_height':     0.50,
+            'static_mapper.esdf_slice_min_height': 0.10,
+            'static_mapper.esdf_slice_max_height': 0.90,
+            'static_mapper.esdf_integrator_min_weight': 0.1,
+            'static_mapper.esdf_integrator_max_site_distance_vox': 2.0,
+            'static_mapper.esdf_integrator_max_distance_m': 2.0,
+            'static_mapper.mesh_integrator_min_weight': 0.1,
+            'static_mapper.mesh_integrator_weld_vertices': True,
+
+            # ── View calculator ──
+            'static_mapper.raycast_subsampling_factor': 4,
+            'static_mapper.workspace_bounds_type': 'unbounded',
+        }],
+        remappings=[
+            ('camera_0/depth/image',        '/zedx_front/zed_node/depth/depth_registered'),
+            ('camera_0/depth/camera_info',  '/zedx_front/zed_node/depth/camera_info'),
+            ('camera_0/color/image',        '/zedx_front/zed_node/left/color/rect/image'),
+            ('camera_0/color/camera_info',  '/zedx_front/zed_node/left/color/rect/camera_info'),
+        ],
+    )
+
+    nvblox_delayed = TimerAction(
+        period=3.0,                       # wait for cuVSLAM tf chain to be up
+        actions=[nvblox_node]
+    )
+    ld.add_action(nvblox_delayed)
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Nav2 stack — starts after nvblox
+    # ──────────────────────────────────────────────────────────────────────
+    nav2_launch = TimerAction(
+        period=5.0,                       # static value matching nav2_delay default
+        actions=[IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(nav2_bringup_pkg, 'launch', 'navigation_launch.py')
+            ),
+            launch_arguments={
+                'use_sim_time': use_sim_time,
+                'params_file': nav2_params_file,
+                'autostart': 'true',
+            }.items(),
+            condition=IfCondition(use_nav2),
+        )]
+    )
+    ld.add_action(nav2_launch)
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Foxglove bridge — visualization (replaces RViz which is broken on Jetson
+    # due to ros-humble-rviz-rendering 11.2.23 missing glsl150 shaders).
+    # See: https://github.com/NVIDIA-ISAAC-ROS/isaac_ros_nvblox/issues/159
+    #
+    # Connect from any machine: ws://<jetson-ip>:8765
+    # ──────────────────────────────────────────────────────────────────────
+    foxglove_bridge = Node(
+        package='foxglove_bridge',
+        executable='foxglove_bridge',
+        name='foxglove_bridge',
+        output='screen',
+        parameters=[{
+            'port': 8765,
+            'address': '0.0.0.0',
+            'tls': False,
+            'topic_whitelist': ['.*'],     # all topics
+            'param_whitelist': ['.*'],
+            'service_whitelist': ['.*'],
+            'client_topic_whitelist': ['.*'],
+            'min_qos_depth': 1,
+            'max_qos_depth': 10,
+            'num_threads': 0,              # auto
+            'send_buffer_limit': 10000000,
+            'use_sim_time': use_sim_time,
+            'capabilities': [
+                'clientPublish',
+                'parameters',
+                'parametersSubscribe',
+                'services',
+                'connectionGraph',
+                'assets',
+            ],
+        }],
+    )
+    ld.add_action(foxglove_bridge)
+
+    return ld

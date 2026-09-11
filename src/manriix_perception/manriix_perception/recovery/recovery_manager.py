@@ -1,30 +1,7 @@
 #!/usr/bin/env python3
-"""
-RecoveryManager - FIXED Version
-================================
-FIXES: [#8] Coordination protocol, [#1] No direct /cmd_vel
-
-COORDINATION PROTOCOL:
-    RecoveryManager                    MissionController
-    ───────────────                    ─────────────────
-    1. Detect issue
-    2. Publish "Level:N" status  ────→ Sets _recovery_lock = True
-    3. Send command              ────→ Receives, ACKs, executes via Nav2
-       _command_state = SENT     ←──── ACK on /mission/recovery_ack
-       _command_state = EXECUTING
-    4. Wait for level duration
-    5. If resolved → "Level:0"   ────→ _recovery_lock = False, resume
-       If not → escalate (only if command not still executing)
-
-KEY RULES:
-    - ONE command per level (no flooding)
-    - Never escalate while command is executing
-    - Emergency stop bypasses protocol
-    - Never publish to /cmd_vel (only /cmd_vel_recovery for emergency)
-"""
 
 import rclpy
-from rclpy.node import Node
+from rclpy.lifecycle import LifecycleNode, State, TransitionCallbackReturn
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 import numpy as np
 from typing import Dict, Optional
@@ -64,7 +41,7 @@ class SystemHealth:
     disk_usage: float = 0.0
 
 
-class RecoveryManager(Node):
+class RecoveryManager(LifecycleNode):
 
     def __init__(self):
         super().__init__('recovery_manager')
@@ -78,75 +55,132 @@ class RecoveryManager(Node):
         self.declare_parameter('system_health_check_interval', 5.0)
         self.declare_parameter('enable_autonomous_navigation', False)
 
-        self.no_data_timeout = self.get_parameter('no_data_timeout').value
-        self.stale_data_timeout = self.get_parameter('stale_data_timeout').value
-        self.max_attempts = self.get_parameter('max_recovery_attempts').value
-        self.safe_parking_pos = np.array(self.get_parameter('safe_parking_position').value)
-        self.command_ack_timeout = self.get_parameter('command_ack_timeout').value
-        self.health_check_interval = self.get_parameter('system_health_check_interval').value
-        self.enable_autonomous_navigation = self.get_parameter('enable_autonomous_navigation').value
+    def on_configure(self, state: State) -> TransitionCallbackReturn:
+        """Load params, init state, create subs/pubs."""
+        self.get_logger().info("Configuring RecoveryManager...")
+        try:
+            self.no_data_timeout = self.get_parameter('no_data_timeout').value
+            self.stale_data_timeout = self.get_parameter('stale_data_timeout').value
+            self.max_attempts = self.get_parameter('max_recovery_attempts').value
+            self.safe_parking_pos = np.array(self.get_parameter('safe_parking_position').value)
+            self.command_ack_timeout = self.get_parameter('command_ack_timeout').value
+            self.health_check_interval = self.get_parameter('system_health_check_interval').value
+            self.enable_autonomous_navigation = self.get_parameter('enable_autonomous_navigation').value
 
-        # Recovery state
-        self.current_level = RecoveryLevel.NORMAL
-        self.recovery_attempts = 0
-        self.level_start_time = time.time()
-        self.last_data_received = time.time()
+            self.current_level = RecoveryLevel.NORMAL
+            self.recovery_attempts = 0
+            self.level_start_time = time.time()
+            self.last_data_received = time.time()
+            self._command_state = CommandState.IDLE
+            self._last_command = None
+            self._command_sent_time = 0.0
+            self._level_command_sent = False
+            self._mission_state = "unknown"
+            self._mission_failed_pois = 0
+            self._estop_override = False
+            self.system_health = SystemHealth()
 
-        # [FIX #8] Command coordination
-        self._command_state = CommandState.IDLE
-        self._last_command = None
-        self._command_sent_time = 0.0
-        self._level_command_sent = False
+            self.level_durations = {
+                RecoveryLevel.WAIT_AND_MONITOR: 15.0,
+                RecoveryLevel.SENSOR_RESET: 30.0,
+                RecoveryLevel.ORIENTATION_SCANNING: 45.0,
+                RecoveryLevel.POSITION_RELOCATION: 60.0,
+                RecoveryLevel.EXPLORATION_MODE: 120.0,
+                RecoveryLevel.SYSTEM_DIAGNOSTIC: 30.0,
+                RecoveryLevel.SAFE_PARKING: 60.0,
+                RecoveryLevel.EMERGENCY_STOP: float('inf'),
+            }
 
-        # System health
-        self.system_health = SystemHealth()
+            qos = QoSProfile(reliability=ReliabilityPolicy.RELIABLE, depth=5)
 
-        # Level durations (seconds to wait before escalating)
-        self.level_durations = {
-            RecoveryLevel.WAIT_AND_MONITOR: 15.0,
-            RecoveryLevel.SENSOR_RESET: 30.0,
-            RecoveryLevel.ORIENTATION_SCANNING: 45.0,
-            RecoveryLevel.POSITION_RELOCATION: 60.0,
-            RecoveryLevel.EXPLORATION_MODE: 120.0,
-            RecoveryLevel.SYSTEM_DIAGNOSTIC: 30.0,
-            RecoveryLevel.SAFE_PARKING: 60.0,
-            RecoveryLevel.EMERGENCY_STOP: float('inf'),
-        }
+            self.humans_sub = self.create_subscription(
+                HumansList, '/human_clustering/humans',
+                self.humans_callback, qos)
+            self.recovery_ack_sub = self.create_subscription(
+                String, '/mission/recovery_ack',
+                self.recovery_ack_callback, qos)
+            self.mission_status_sub = self.create_subscription(
+                String, '/mission/status',
+                self.mission_status_callback, qos)
+            self.override_sub = self.create_subscription(
+                Bool, '/recovery/override',
+                self.override_callback, qos)
 
-        qos = QoSProfile(reliability=ReliabilityPolicy.RELIABLE, depth=5)
+            self.command_pub = self.create_publisher(String, '/recovery/command', qos)
+            self.status_pub = self.create_publisher(String, '/recovery/status', qos)
+            self.emergency_stop_pub = self.create_publisher(Bool, '/e_stop', qos)
+            self.emergency_vel_pub = self.create_publisher(Twist, '/cmd_vel_recovery', qos)
 
-        # Subscribers
-        self.humans_sub = self.create_subscription(
-            HumansList, '/human_clustering/humans',
-            self.humans_callback, qos)
+            self.get_logger().info("RecoveryManager configured")
+            return TransitionCallbackReturn.SUCCESS
 
-        self.recovery_ack_sub = self.create_subscription(
-            String, '/mission/recovery_ack',
-            self.recovery_ack_callback, qos)
+        except Exception as e:
+            self.get_logger().error(f"Configuration failed: {e}")
+            return TransitionCallbackReturn.FAILURE
 
-        self.mission_status_sub = self.create_subscription(
-            String, '/mission/status',
-            self.mission_status_callback, qos)
+    def on_activate(self, state: State) -> TransitionCallbackReturn:
+        """Start recovery check loop."""
+        self.get_logger().info("Activating RecoveryManager...")
+        try:
+            self.check_timer = self.create_timer(1.0, self.check_for_issues)
+            self.health_timer = self.create_timer(self.health_check_interval, self.system_health_check)
+            self.get_logger().info("RecoveryManager active — monitoring started")
+            return TransitionCallbackReturn.SUCCESS
+        except Exception as e:
+            self.get_logger().error(f"Activation failed: {e}")
+            return TransitionCallbackReturn.FAILURE
 
-        # Publishers
-        self.command_pub = self.create_publisher(String, '/recovery/command', qos)
-        self.status_pub = self.create_publisher(String, '/recovery/status', qos)
-        self.emergency_stop_pub = self.create_publisher(Bool, '/e_stop', qos)
-        self.emergency_vel_pub = self.create_publisher(Twist, '/cmd_vel_recovery', qos)
+    def on_deactivate(self, state: State) -> TransitionCallbackReturn:
+        """Stop timers."""
+        self.get_logger().info("Deactivating RecoveryManager...")
+        try:
+            if hasattr(self, 'check_timer') and self.check_timer:
+                self.check_timer.cancel()
+                self.check_timer = None
+            if hasattr(self, 'health_timer') and self.health_timer:
+                self.health_timer.cancel()
+                self.health_timer = None
+            return TransitionCallbackReturn.SUCCESS
+        except Exception as e:
+            self.get_logger().error(f"Deactivation failed: {e}")
+            return TransitionCallbackReturn.FAILURE
 
-        # Timers
-        self.check_timer = self.create_timer(1.0, self.check_for_issues)
-        self.health_timer = self.create_timer(self.health_check_interval, self.system_health_check)
+    def on_cleanup(self, state: State) -> TransitionCallbackReturn:
+        """Clear recovery state."""
+        self.get_logger().info("Cleaning up RecoveryManager...")
+        try:
+            self.current_level = RecoveryLevel.NORMAL
+            self.recovery_attempts = 0
+            self._command_state = CommandState.IDLE
+            self._level_command_sent = False
+            return TransitionCallbackReturn.SUCCESS
+        except Exception as e:
+            self.get_logger().error(f"Cleanup failed: {e}")
+            return TransitionCallbackReturn.FAILURE
 
-        self.get_logger().info("RecoveryManager initialized with coordination protocol")
-
+    def on_shutdown(self, state: State) -> TransitionCallbackReturn:
+        """Clear e-stop and cancel timers."""
+        self.get_logger().info("Shutting down RecoveryManager...")
+        try:
+            if hasattr(self, 'emergency_stop_pub'):
+                msg = Bool()
+                msg.data = False
+                self.emergency_stop_pub.publish(msg)
+            if hasattr(self, 'check_timer') and self.check_timer:
+                self.check_timer.cancel()
+            if hasattr(self, 'health_timer') and self.health_timer:
+                self.health_timer.cancel()
+            return TransitionCallbackReturn.SUCCESS
+        except Exception as e:
+            self.get_logger().error(f"Shutdown failed: {e}")
+            return TransitionCallbackReturn.FAILURE
+        
     # ====================================================================
     # CALLBACKS
     # ====================================================================
-
     def humans_callback(self, msg: HumansList):
         """Track data reception — triggers recovery success check"""
-        if msg.human_count > 0:
+        if len(msg.humans) > 0:
             self.last_data_received = time.time()
             if self.current_level != RecoveryLevel.NORMAL:
                 self._check_recovery_success()
@@ -172,14 +206,67 @@ class RecoveryManager(Node):
             self.get_logger().error(f"Error processing ACK: {e}")
 
     def mission_status_callback(self, msg: String):
-        """Detect when mission controller finishes our command"""
+        """Track mission controller state for nav failure detection"""
         try:
+            # Track command execution completion
             if ("State:idle" in msg.data and
                 self._command_state == CommandState.EXECUTING):
                 self.get_logger().info("Command execution completed")
                 self._command_state = CommandState.IDLE
+            
+            # [FIX #NAV] Track mission state and failed POIs
+            self._mission_state = "unknown"
+            if "State:" in msg.data:
+                self._mission_state = msg.data.split("State:")[1].split()[0]
+            
+            self._mission_failed_pois = 0
+            if "FailedPOIs:" in msg.data:
+                try:
+                    self._mission_failed_pois = int(
+                        msg.data.split("FailedPOIs:")[1].split()[0])
+                except ValueError:
+                    pass
+                    
         except Exception as e:
             self.get_logger().error(f"Error in mission status: {e}")
+
+    def override_callback(self, msg: Bool):
+        """
+        [FIX #ESTOP] Manual override to clear emergency stop.
+        
+        Usage: ros2 topic pub --once /recovery/override std_msgs/Bool "data: true"
+        
+        Only works when at Level 8. Clears e-stop and returns to NORMAL.
+        Operator can then use teleop or let autonomous system resume.
+        """
+        try:
+            if msg.data and self.current_level == RecoveryLevel.EMERGENCY_STOP:
+                self.get_logger().warn(
+                    "🔓 MANUAL OVERRIDE — clearing emergency stop")
+                self._estop_override = True
+                
+                # Clear e-stop
+                emergency_msg = Bool()
+                emergency_msg.data = False
+                self.emergency_stop_pub.publish(emergency_msg)
+                
+                # Return to normal
+                self.current_level = RecoveryLevel.NORMAL
+                self.recovery_attempts = 0
+                self._command_state = CommandState.IDLE
+                self._level_command_sent = False
+                self._last_command = None
+                self._estop_override = False
+                self._publish_status()  # Level:0 → mission controller unlocks
+                
+                self.get_logger().warn(
+                    "✅ Emergency stop cleared — robot can be controlled")
+            elif msg.data and self.current_level != RecoveryLevel.EMERGENCY_STOP:
+                self.get_logger().info(
+                    f"Override ignored — not in emergency stop "
+                    f"(current level: {self.current_level.value})")
+        except Exception as e:
+            self.get_logger().error(f"Error in override: {e}")            
 
     # ====================================================================
     # MAIN LOOP
@@ -204,6 +291,14 @@ class RecoveryManager(Node):
                     self.get_logger().warn(f"No data for {time_since_data:.0f}s")
                     self._escalate_to(RecoveryLevel.WAIT_AND_MONITOR)
 
+                # [FIX #NAV] Trigger 3: Mission controller exhausted all POIs
+                elif (self._mission_state == "recovery" and 
+                      self._mission_failed_pois > 0):
+                    self.get_logger().warn(
+                        f"Navigation failure detected — mission in recovery "
+                        f"with {self._mission_failed_pois} failed POIs")
+                    self._escalate_to(RecoveryLevel.WAIT_AND_MONITOR)
+
                 elif (self.system_health.cpu_usage > 98 or
                       self.system_health.memory_usage > 95):
                     self.get_logger().warn("System overload")
@@ -216,14 +311,15 @@ class RecoveryManager(Node):
             self.get_logger().error(f"Error in check loop: {e}")
 
     def _manage_recovery_level(self, current_time: float):
-        """
-        [FIX #8] Recovery level management with coordination.
+        # [FIX #ESTOP] Keep publishing e-stop every second while at Level 8
+        if self.current_level == RecoveryLevel.EMERGENCY_STOP:
+            stop_msg = Twist()
+            self.emergency_vel_pub.publish(stop_msg)
+            emergency_msg = Bool()
+            emergency_msg.data = True
+            self.emergency_stop_pub.publish(emergency_msg)
+            return
 
-        1. Send command for this level (once)
-        2. Wait for level duration
-        3. Check if issue resolved
-        4. If not, escalate (but ONLY if command is not still executing)
-        """
         level_elapsed = current_time - self.level_start_time
         level_duration = self.level_durations.get(self.current_level, 30.0)
 
@@ -269,6 +365,10 @@ class RecoveryManager(Node):
 
     def _check_recovery_success(self) -> bool:
         """Check if recovery condition is resolved"""
+        # [FIX #ESTOP] Never auto-recover from emergency stop
+        if self.current_level == RecoveryLevel.EMERGENCY_STOP:
+            return False
+        
         time_since_data = time.time() - self.last_data_received
         if time_since_data < 5.0:
             self.get_logger().info("Data received — recovery successful!")
@@ -407,12 +507,13 @@ class RecoveryManager(Node):
         else:
             self.get_logger().info("Diagnostics: all OK")
 
-
 def main(args=None):
     rclpy.init(args=args)
     node = RecoveryManager()
+    executor = rclpy.executors.MultiThreadedExecutor()
+    executor.add_node(node)
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:

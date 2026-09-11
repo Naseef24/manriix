@@ -1,0 +1,59 @@
+/**:
+  ros__parameters:
+    general:
+      grab_resolution: SVGA
+      grab_frame_rate: 15
+      pub_frame_rate: 15.0
+      camera_name: zedx_front
+      camera_model: zedx
+      serial_number: 41911351
+    video:
+      publish_left_right: true
+      publish_gray: true
+    depth:
+      depth_mode: NEURAL_LIGHT
+      depth_stabilization: 1
+      min_depth: 0.3
+      max_depth: 7.0
+      depth_confidence: 50
+      point_cloud_freq: 10.0
+    pos_tracking:
+      pos_tracking_enabled: true
+      publish_tf: false
+      publish_map_tf: false
+      publish_odom_pose: false
+      publish_pose_cov: false
+      publish_cam_path: false
+
+      # Do not use ZED SLAM/localisation features
+      area_memory: false
+      reset_odom_with_loop_closure: false
+    sensors:
+      sensors_image_sync: false
+      publish_imu_tf: true
+    object_detection:
+      od_enabled: true
+      enable_tracking: true
+      detection_model: PERSON_HEAD_BOX_FAST
+      max_range: 7.0
+      filtering_mode: NMS3D
+      prediction_timeout: 0.5
+      allow_reduced_precision_inference: true
+      class:
+        people:
+          enabled: true
+          confidence_threshold: 40.0
+        vehicle:
+          enabled: false
+        bag:
+          enabled: false
+        animal:
+          enabled: false
+        electronics:
+          enabled: false
+        fruit_vegetable:
+          enabled: false
+        sport:
+          enabled: false
+    body_tracking:
+      bt_enabled: false

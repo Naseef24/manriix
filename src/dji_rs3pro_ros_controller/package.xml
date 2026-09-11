@@ -2,16 +2,17 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>dji_rs3pro_ros_controller</name>
-  <version>0.0.0</version>
-  <description>DJI RS3 Pro Gimbal Controller for ROS2</description>
+  <version>0.1.0</version>
+  <description>DJI RS3 Pro Gimbal Controller for ROS2 — LifecycleNode, CAN bus, camera control</description>
   <maintainer email="hussain.avn@gmail.com">nisat</maintainer>
   <license>MIT</license>
 
-  <!-- Build dependencies -->
+  <!-- Build tools -->
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
   <buildtool_depend>rosidl_default_generators</buildtool_depend>
 
-  <!-- Runtime dependencies -->
+  <!-- Python runtime -->
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
@@ -20,8 +21,9 @@
   <depend>tf2_geometry_msgs</depend>
   <depend>can_msgs</depend>
   <depend>builtin_interfaces</depend>
+  <depend>std_srvs</depend>
 
-  <!-- Message generation -->
+  <!-- Message generation runtime -->
   <exec_depend>rosidl_default_runtime</exec_depend>
   <member_of_group>rosidl_interface_packages</member_of_group>
 

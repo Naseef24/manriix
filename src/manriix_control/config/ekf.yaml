@@ -2,27 +2,25 @@
 # EKF Configuration for Manriix 4WS Robot
 # ═══════════════════════════════════════════════════════════════════════════════
 #
-# Uses robot_localization package for sensor fusion
-# Tested: 2025-02-15 — working with SLAM Toolbox mapping, no drift/shaking
+# Uses robot_localization package for sensor fusion (when enabled — note that
+# in the cuVSLAM + nvblox stack, EKF is disabled by default because cuVSLAM
+# publishes BOTH map->odom AND odom->base_footprint transforms directly).
 #
-# Sensors:
-#   odom0: Wheel odometry  → x, y, vx, vyaw (translation + yaw velocity)
-#   imu0:  ZED X Front IMU → roll, pitch, yaw, vroll, vpitch, vyaw (all rotation)
+# When EKF IS enabled, it fuses:
+#   odom0: Wheel odometry  → x, y, vx, vyaw
+#   imu0:  ZED X Front IMU → roll, pitch, yaw, vroll, vpitch, vyaw
 #
 # Design decisions:
-#   - Wheel odom does NOT fuse absolute yaw — this caused shaking because
-#     wheel yaw and IMU yaw fought each other during turns on the 4WS robot.
-#   - Wheel odom DOES fuse vyaw — gives the EKF two yaw velocity sources
-#     (wheel + IMU gyro) to cross-check, improving turn responsiveness.
+#   - Wheel odom does NOT fuse absolute yaw — caused shaking because
+#     wheel yaw and IMU yaw fought each other during 4WS turns.
+#   - Wheel odom DOES fuse vyaw — two yaw velocity sources improve
+#     turn responsiveness.
 #   - IMU owns all absolute orientation (roll, pitch, yaw).
-#   - Only front ZED X IMU is used — multiple IMUs at different positions
-#     produce conflicting readings due to vibration and centripetal acceleration.
-#   - IMU data is axis-corrected in direct_zed_detection_node.py _imu_loop()
-#     from ZED SDK RIGHT_HANDED_Y_UP to ROS RIGHT_HANDED_Z_UP.
+#   - Only front ZED X IMU is used; multiple IMUs would conflict due
+#     to vibration and centripetal acceleration during turns.
 #
 # References:
 #   - robot_localization docs: http://docs.ros.org/en/noetic/api/robot_localization/html/configuring_robot_localization.html
-#   - Nav2 setup guide: https://docs.nav2.org/setup_guides/odom/setup_robot_localization.html
 # ═══════════════════════════════════════════════════════════════════════════════
 
 ekf_filter_node:

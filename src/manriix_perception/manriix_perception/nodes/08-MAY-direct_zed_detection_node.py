@@ -1,0 +1,1543 @@
+#!/usr/bin/env python3
+"""
+Direct ZED Detection Node - Multi-Camera SDK Driver
+
+Replaces the ZED ROS2 wrapper with direct SDK access for:
+  - Lower GPU/CPU usage
+  - Better multi-camera stability
+  - Integrated IMU publishing for EKF
+  - Optional YOLO detection (disabled in nav mode)
+
+Modes:
+  nav:  Point clouds + IMU only (for navigation, no YOLO)
+  full: Point clouds + IMU + YOLO detection + images (for photography)
+
+Topics published (always):
+  Point Clouds (for STVL, RELIABLE QoS):
+    /zedx_front/zed_node/point_cloud/cloud_registered
+    /zedx_left/zed_node/point_cloud/cloud_registered
+    /zedx_right/zed_node/point_cloud/cloud_registered
+
+  IMU (for EKF, front camera only):
+    /zedx_front/zed_node/imu/data
+
+  Color Images (compressed):
+    /zedx_front/zed_node/left/image_rect_color/compressed
+    /zedx_left/zed_node/left/image_rect_color/compressed
+    /zedx_right/zed_node/left/image_rect_color/compressed
+
+  Depth Images (compressed):
+    /zedx_front/zed_node/depth/depth_registered/compressedDepth
+    /zedx_left/zed_node/depth/depth_registered/compressedDepth
+    /zedx_right/zed_node/depth/depth_registered/compressedDepth
+
+  Detection (full mode only):
+    /human_clustering/humans
+    /web/camera_detections
+    /viz/camera/zedx_*/image_rect_color/compressed
+
+File: direct_zed_detection_node.py
+"""
+
+import rclpy
+from rclpy.node import Node
+from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
+import pyzed.sl as sl
+import cv2
+import numpy as np
+import threading
+import time
+import yaml
+import os
+import json
+import math
+from pathlib import Path
+from typing import Dict, List, Optional, Any, Tuple
+from dataclasses import dataclass, field
+from geometry_msgs.msg import Point, Vector3, Quaternion
+from std_msgs.msg import Header, String
+from sensor_msgs.msg import CompressedImage, PointCloud2, Imu, Image, CameraInfo
+from sensor_msgs_py import point_cloud2
+from cv_bridge import CvBridge
+
+# Only import perception messages if available (not needed in nav mode)
+try:
+    from manriix_perception.msg import HumansList, HumanTrackingData, ObjectsList, ObjectTrackingData
+    PERCEPTION_MSGS_AVAILABLE = True
+except ImportError:
+    PERCEPTION_MSGS_AVAILABLE = False
+
+
+@dataclass
+class PersonDetection:
+    """Person detection data structure"""
+    tracking_id: int
+    raw_position: List[float]
+    position: Point
+    confidence: float
+    distance: float
+    bounding_box_2d: List[List[float]]
+    velocity: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
+    camera_name: str = ""
+    timestamp: float = 0.0
+
+
+@dataclass
+class ObjectDetection:
+    """Generic object detection data structure (multi-class support)"""
+    tracking_id: int
+    class_id: int              # COCO class ID (0-79)
+    class_name: str            # Human-readable class name
+    raw_position: List[float]
+    position: Point
+    confidence: float
+    distance: float
+    bounding_box_2d: List[List[float]]
+    velocity: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
+    camera_name: str = ""
+    timestamp: float = 0.0
+
+
+# COCO Class Names (80 classes)
+COCO_CLASS_NAMES = {
+    0: 'person', 1: 'bicycle', 2: 'car', 3: 'motorcycle', 4: 'airplane',
+    5: 'bus', 6: 'train', 7: 'truck', 8: 'boat', 9: 'traffic light',
+    10: 'fire hydrant', 11: 'stop sign', 12: 'parking meter', 13: 'bench', 14: 'bird',
+    15: 'cat', 16: 'dog', 17: 'horse', 18: 'sheep', 19: 'cow',
+    20: 'elephant', 21: 'bear', 22: 'zebra', 23: 'giraffe', 24: 'backpack',
+    25: 'umbrella', 26: 'handbag', 27: 'tie', 28: 'suitcase', 29: 'frisbee',
+    30: 'skis', 31: 'snowboard', 32: 'sports ball', 33: 'kite', 34: 'baseball bat',
+    35: 'baseball glove', 36: 'skateboard', 37: 'surfboard', 38: 'tennis racket', 39: 'bottle',
+    40: 'wine glass', 41: 'cup', 42: 'fork', 43: 'knife', 44: 'spoon',
+    45: 'bowl', 46: 'banana', 47: 'apple', 48: 'sandwich', 49: 'orange',
+    50: 'broccoli', 51: 'carrot', 52: 'hot dog', 53: 'pizza', 54: 'donut',
+    55: 'cake', 56: 'chair', 57: 'couch', 58: 'potted plant', 59: 'bed',
+    60: 'dining table', 61: 'toilet', 62: 'tv', 63: 'laptop', 64: 'mouse',
+    65: 'remote', 66: 'keyboard', 67: 'cell phone', 68: 'microwave', 69: 'oven',
+    70: 'toaster', 71: 'sink', 72: 'refrigerator', 73: 'book', 74: 'clock',
+    75: 'vase', 76: 'scissors', 77: 'teddy bear', 78: 'hair drier', 79: 'toothbrush'
+}
+
+
+# Camera Transforms (from URDF)
+CAMERA_TRANSFORMS = {
+    'front': {
+        'position': [0.145, 0.0, 0.815],
+        'yaw': 0.0,
+    },
+    'left': {
+        'position': [0.0, 0.175, 0.815],
+        'yaw': 2.094,
+    },
+    'right': {
+        'position': [0.0, -0.175, 0.815],
+        'yaw': -2.094,
+    },
+}
+
+
+class CameraHandler:
+    """Handles a single ZED X camera with threading"""
+
+    def __init__(self, camera_name: str, serial_number: int, logger):
+        self.camera_name = camera_name
+        self.serial_number = serial_number
+        self.logger = logger
+
+        self.zed: Optional[sl.Camera] = None
+        self.running = False
+        self.thread: Optional[threading.Thread] = None
+
+        # Detection data (thread-safe)
+        self.current_frame: Optional[np.ndarray] = None
+        self.current_depth: Optional[np.ndarray] = None
+        self.current_detections: List[PersonDetection] = []  # Legacy person-only detections
+        self.current_objects: List[ObjectDetection] = []  # All detected objects (all COCO classes)
+        self.current_point_cloud: Optional[np.ndarray] = None
+        self.current_imu_data: Optional[Dict] = None
+        self.imu_thread: Optional[threading.Thread] = None
+        self.imu_thread_running = False
+        self.frame_lock = threading.Lock()
+        
+        # COCO class name mapping for object detection
+        self.class_names = COCO_CLASS_NAMES
+
+        # Metrics
+        self.frame_count = 0
+        self.detection_count = 0
+        self.fps_samples: List[float] = []
+        self.last_detection_time = 0.0
+        self.grab_errors = 0
+
+    def setup(self, resolution: sl.RESOLUTION, depth_mode: sl.DEPTH_MODE,
+              fps: int = 15, enable_tracking: bool = False) -> bool:
+        """Initialize camera with retry logic"""
+        self.zed = sl.Camera()
+
+        init_params = sl.InitParameters()
+        init_params.camera_resolution = resolution
+        init_params.camera_fps = fps
+        init_params.depth_mode = depth_mode
+        init_params.coordinate_units = sl.UNIT.METER
+        init_params.coordinate_system = sl.COORDINATE_SYSTEM.RIGHT_HANDED_Y_UP
+        init_params.depth_minimum_distance = 0.3
+        init_params.depth_maximum_distance = 10.0
+        init_params.set_from_serial_number(self.serial_number)
+
+        # Retry logic for multi-camera stability
+        max_retries = 3
+        for attempt in range(max_retries):
+            err = self.zed.open(init_params)
+            if err == sl.ERROR_CODE.SUCCESS:
+                break
+            self.logger.warn(
+                f"Camera {self.camera_name} open attempt {attempt+1}/{max_retries}: {err}")
+            time.sleep(2.0)
+        else:
+            self.logger.error(
+                f"Failed to open {self.camera_name} (SN:{self.serial_number}) after {max_retries} attempts")
+            return False
+
+        # Enable positional tracking only if needed (for detection stability)
+        if enable_tracking:
+            tracking_params = sl.PositionalTrackingParameters()
+            tracking_params.enable_imu_fusion = True
+            self.zed.enable_positional_tracking(tracking_params)
+
+        # Warmup: grab a few frames to stabilize
+        self.logger.info(f"Camera {self.camera_name}: warming up...")
+        for _ in range(10):
+            self.zed.grab()
+            time.sleep(0.05)
+
+        self.logger.info(
+            f"Camera {self.camera_name} ready (SN:{self.serial_number})")
+        return True
+
+    def enable_detection(self, model_type: sl.OBJECT_DETECTION_MODEL,
+                         custom_onnx_path: Optional[str] = None) -> bool:
+        """Enable object detection with specified model"""
+        try:
+            self.zed.disable_object_detection()
+            time.sleep(0.3)
+        except:
+            pass
+
+        obj_params = sl.ObjectDetectionParameters()
+        obj_params.enable_tracking = True
+        obj_params.enable_segmentation = False
+        obj_params.detection_model = model_type
+
+        if custom_onnx_path and os.path.exists(os.path.expanduser(custom_onnx_path)):
+            obj_params.custom_onnx_file = os.path.expanduser(custom_onnx_path)
+            self.logger.info(f"Using custom ONNX model: {custom_onnx_path}")
+
+        err = self.zed.enable_object_detection(obj_params)
+        if err != sl.ERROR_CODE.SUCCESS:
+            self.logger.error(f"Failed to enable detection on {self.camera_name}: {err}")
+            return False
+
+        self.logger.info(f"Detection enabled on {self.camera_name}")
+        return True
+
+    def is_person(self, obj) -> bool:
+        """Check if detected object is a person"""
+        if hasattr(obj, 'raw_label'):
+            try:
+                if int(obj.raw_label) == 0:
+                    return True
+            except:
+                pass
+        try:
+            if hasattr(sl, 'OBJECT_CLASS') and obj.label == sl.OBJECT_CLASS.PERSON:
+                return True
+        except:
+            pass
+        return False
+    
+    def get_class_info(self, obj) -> tuple[int, str]:
+        """Get class ID and name from detected object"""
+        class_id = 0  # Default to person
+        if hasattr(obj, 'raw_label'):
+            try:
+                class_id = int(obj.raw_label)
+            except:
+                pass
+        class_name = self.class_names.get(class_id, 'unknown')
+        return class_id, class_name
+
+    def capture_loop(self, confidence_threshold: int = 50,
+                     enable_detection: bool = True,
+                     publish_imu: bool = False):
+        """Main capture loop running in dedicated thread"""
+        image = sl.Mat()
+        objects = sl.Objects()
+        sensors_data = sl.SensorsData()
+
+        runtime_params = sl.RuntimeParameters()
+        obj_runtime_params = sl.ObjectDetectionRuntimeParameters()
+        obj_runtime_params.detection_confidence_threshold = confidence_threshold
+
+        while self.running:
+            frame_start = time.time()
+
+            grab_status = self.zed.grab(runtime_params)
+            if grab_status == sl.ERROR_CODE.SUCCESS:
+                self.grab_errors = 0
+
+                # === POINT CLOUD (always) ===
+                point_cloud = sl.Mat()
+                self.zed.retrieve_measure(point_cloud, sl.MEASURE.XYZRGBA)
+
+                # === IMU DATA (if enabled, typically front camera only) ===
+                imu_dict = None
+                if publish_imu:
+                    try:
+                        self.zed.get_sensors_data(sensors_data, sl.TIME_REFERENCE.IMAGE)
+                        imu = sensors_data.get_imu_data()
+
+                        # Get orientation quaternion
+                        orientation = imu.get_pose().get_orientation().get()
+                        # Get angular velocity (deg/s → rad/s)
+                        angular_vel = imu.get_angular_velocity()
+                        # Get linear acceleration
+                        linear_acc = imu.get_linear_acceleration()
+
+                        # imu_dict = {
+                        #     'orientation': {
+                        #         'x': float(orientation[0]),
+                        #         'y': float(orientation[1]),
+                        #         'z': float(orientation[2]),
+                        #         'w': float(orientation[3]),
+                        #     },
+                        #     'angular_velocity': {
+                        #         'x': float(angular_vel[0]) * math.pi / 180.0,
+                        #         'y': float(angular_vel[1]) * math.pi / 180.0,
+                        #         'z': float(angular_vel[2]) * math.pi / 180.0,
+                        #     },
+                        #     'linear_acceleration': {
+                        #         'x': float(linear_acc[0]),
+                        #         'y': float(linear_acc[1]),
+                        #         'z': float(linear_acc[2]),
+                        #     },
+                        # }
+                        
+                        # Convert from ZED Y_UP to ROS Z_UP
+                        # Y_UP: x=right, y=up, z=backward  
+                        # Z_UP_X_FWD: x=forward, y=left, z=up
+                        # Rotation: ros_x = -zed_z, ros_y = -zed_x, ros_z = zed_y
+                        imu_dict = {
+                            'orientation': {
+                                'x': -float(orientation[2]),
+                                'y': -float(orientation[0]),
+                                'z': float(orientation[1]),
+                                'w': float(orientation[3]),
+                            },
+                            'angular_velocity': {
+                                'x': -float(angular_vel[2]) * math.pi / 180.0,
+                                'y': -float(angular_vel[0]) * math.pi / 180.0,
+                                'z': float(angular_vel[1]) * math.pi / 180.0,
+                            },
+                            'linear_acceleration': {
+                                'x': -float(linear_acc[2]),
+                                'y': -float(linear_acc[0]),
+                                'z': float(linear_acc[1]),
+                            }
+                        }                        
+                    except Exception as e:
+                        if self.frame_count % 100 == 0:
+                            self.logger.warn(f"IMU read error on {self.camera_name}: {e}")
+
+                # === COLOR IMAGE (every 5th frame to save GPU) ===
+                img_bgr = None
+                depth_data = None
+                retrieve_images = (self.frame_count % 5 == 0) or enable_detection
+
+                if retrieve_images:
+                    self.zed.retrieve_image(image, sl.VIEW.LEFT)
+                    img_rgba = image.get_data()
+                    img_bgr = cv2.cvtColor(img_rgba, cv2.COLOR_RGBA2BGR)
+
+                    # === DEPTH IMAGE (same rate as color) ===
+                    depth_mat = sl.Mat()
+                    self.zed.retrieve_measure(depth_mat, sl.MEASURE.DEPTH)
+                    depth_data = depth_mat.get_data()
+
+                # === DETECTION (full mode only) ===
+                persons = []  # Legacy person-only detections
+                objects_detected = []  # Multi-class detections
+
+                if enable_detection:
+                    self.zed.retrieve_objects(objects, obj_runtime_params)
+
+                    for obj in objects.object_list:
+                        if obj.tracking_state == sl.OBJECT_TRACKING_STATE.OK:
+                            pos = obj.position
+                            distance = np.sqrt(pos[0]**2 + pos[1]**2 + pos[2]**2)
+
+                            bbox_2d = []
+                            try:
+                                for corner in obj.bounding_box_2d:
+                                    bbox_2d.append([float(corner[0]), float(corner[1])])
+                            except:
+                                bbox_2d = []
+
+                            velocity = [0.0, 0.0, 0.0]
+                            try:
+                                if len(obj.velocity) >= 3:
+                                    velocity = [float(v) for v in obj.velocity[:3]]
+                            except:
+                                pass
+
+                            # Create PersonDetection for backward compatibility (person only)
+                            if self.is_person(obj):
+                                detection = PersonDetection(
+                                    tracking_id=obj.id,
+                                    raw_position=[float(pos[0]), float(pos[1]), float(pos[2])],
+                                    position=Point(),
+                                    confidence=float(obj.confidence),
+                                    distance=distance,
+                                    bounding_box_2d=bbox_2d,
+                                    velocity=velocity,
+                                    camera_name=self.camera_name,
+                                    timestamp=time.time()
+                                )
+                                persons.append(detection)
+                            
+                            # Create ObjectDetection for ALL detected objects (no filtering)
+                            # Downstream consumers can filter by class_id as needed
+                            class_id, class_name = self.get_class_info(obj)
+                            object_det = ObjectDetection(
+                                tracking_id=obj.id,
+                                class_id=class_id,
+                                class_name=class_name,
+                                raw_position=[float(pos[0]), float(pos[1]), float(pos[2])],
+                                position=Point(),
+                                confidence=float(obj.confidence),
+                                distance=distance,
+                                bounding_box_2d=bbox_2d,
+                                velocity=velocity,
+                                camera_name=self.camera_name,
+                                timestamp=time.time()
+                            )
+                            objects_detected.append(object_det)
+
+                # Update shared data (thread-safe)
+                with self.frame_lock:
+                    if img_bgr is not None:
+                        self.current_frame = img_bgr.copy()
+                    if depth_data is not None:
+                        self.current_depth = depth_data.copy()
+                    self.current_detections = persons.copy()  # Legacy person-only
+                    self.current_objects = objects_detected.copy()  # Multi-class
+                    self.current_point_cloud = point_cloud.get_data().copy()
+                    # self.current_imu_data = imu_dict  # Now handled by IMU thread
+                    self.frame_count += 1
+                    self.detection_count += len(persons)
+                    if persons:
+                        self.last_detection_time = time.time()
+
+                # Calculate FPS
+                frame_time = time.time() - frame_start
+                if frame_time > 0:
+                    self.fps_samples.append(1.0 / frame_time)
+                    if len(self.fps_samples) > 30:
+                        self.fps_samples.pop(0)
+
+            else:
+                self.grab_errors += 1
+                if self.grab_errors <= 5 or self.grab_errors % 50 == 0:
+                    self.logger.warn(
+                        f"Camera {self.camera_name} grab error: {grab_status} "
+                        f"(count: {self.grab_errors})")
+
+            time.sleep(0.001)
+
+    def start(self, confidence_threshold: int = 50,
+              enable_detection: bool = True,
+              publish_imu: bool = False):
+        """Start capture thread"""
+        self.running = True
+        self.thread = threading.Thread(
+            target=self.capture_loop,
+            args=(confidence_threshold, enable_detection, publish_imu),
+            daemon=True
+        )
+        self.thread.start()
+        self.logger.info(
+            f"Capture thread started for {self.camera_name} "
+            f"(detection={'ON' if enable_detection else 'OFF'}, "
+            f"imu={'ON' if publish_imu else 'OFF'})")
+
+    def stop(self):
+        """Stop capture thread"""
+        self.running = False
+        if self.thread:
+            self.thread.join(timeout=2.0)
+        self.logger.info(f"Capture thread stopped for {self.camera_name}")
+
+    def get_detections(self) -> List[PersonDetection]:
+        with self.frame_lock:
+            return self.current_detections.copy()
+
+    def get_objects(self) -> List[ObjectDetection]:
+        """Get all detected objects (all COCO classes)"""
+        with self.frame_lock:
+            return self.current_objects.copy()
+
+    def get_frame(self) -> Optional[np.ndarray]:
+        with self.frame_lock:
+            return self.current_frame.copy() if self.current_frame is not None else None
+
+    def get_frame_with_boxes(self) -> Tuple[Optional[np.ndarray], List[PersonDetection]]:
+        with self.frame_lock:
+            if self.current_frame is None:
+                return None, []
+            return self.current_frame.copy(), self.current_detections.copy()
+
+    def get_point_cloud(self) -> Optional[np.ndarray]:
+        with self.frame_lock:
+            return self.current_point_cloud.copy() if self.current_point_cloud is not None else None
+
+    def get_depth(self) -> Optional[np.ndarray]:
+        with self.frame_lock:
+            return self.current_depth.copy() if self.current_depth is not None else None
+
+    def get_imu_data(self) -> Optional[Dict]:
+        with self.frame_lock:
+            return self.current_imu_data.copy() if self.current_imu_data is not None else None
+
+
+    def start_imu_thread(self, rate_hz: float = 100.0, publisher=None, clock=None):
+        """Start dedicated high-frequency IMU reading thread."""
+        if self.zed is None or not self.zed.is_opened():
+            self.logger.warn(f"Cannot start IMU thread - camera {self.camera_name} not open")
+            return
+        self.imu_publisher = publisher
+        self.imu_clock = clock
+        self.imu_thread_running = True
+        self.imu_thread = threading.Thread(
+            target=self._imu_loop, args=(rate_hz,), daemon=True)
+        self.imu_thread.start()
+        self.logger.info(f"IMU thread started for {self.camera_name} at {rate_hz}Hz")
+
+
+
+
+
+
+
+
+
+
+
+    def _imu_loop(self, rate_hz: float):
+        """High-frequency IMU reading loop using TIME_REFERENCE.CURRENT"""
+        period = 1.0 / rate_hz
+        sensors_data = sl.SensorsData()
+        last_ts = 0
+        while self.imu_thread_running and self.running:
+            try:
+                status = self.zed.get_sensors_data(sensors_data, sl.TIME_REFERENCE.CURRENT)
+                if status == sl.ERROR_CODE.SUCCESS:
+                    imu = sensors_data.get_imu_data()
+                    ts = imu.timestamp.get_nanoseconds()
+                    if ts != last_ts:
+                        last_ts = ts
+                        orientation = imu.get_pose().get_orientation().get()
+                        angular_vel = imu.get_angular_velocity()
+                        linear_acc = imu.get_linear_acceleration()
+                        # imu_dict = {
+                        #     'orientation': {
+                        #         'x': float(orientation[0]),
+                        #         'y': float(orientation[1]),
+                        #         'z': float(orientation[2]),
+                        #         'w': float(orientation[3]),
+                        #     },
+                        #     'angular_velocity': {
+                        #         'x': float(angular_vel[0]) * math.pi / 180.0,
+                        #         'y': float(angular_vel[1]) * math.pi / 180.0,
+                        #         'z': float(angular_vel[2]) * math.pi / 180.0,
+                        #     },
+                        #     'linear_acceleration': {
+                        #         'x': float(linear_acc[0]),
+                        #         'y': float(linear_acc[1]),
+                        #         'z': float(linear_acc[2]),
+                        #     }
+                        # }
+                        
+                        # Convert from ZED Y_UP to ROS Z_UP
+                        # Y_UP: x=right, y=up, z=backward  
+                        # Z_UP_X_FWD: x=forward, y=left, z=up
+                        # Rotation: ros_x = -zed_z, ros_y = -zed_x, ros_z = zed_y
+                        imu_dict = {
+                            'orientation': {
+                                'x': -float(orientation[2]),
+                                'y': -float(orientation[0]),
+                                'z': float(orientation[1]),
+                                'w': float(orientation[3]),
+                            },
+                            'angular_velocity': {
+                                'x': -float(angular_vel[2]) * math.pi / 180.0,
+                                'y': -float(angular_vel[0]) * math.pi / 180.0,
+                                'z': float(angular_vel[1]) * math.pi / 180.0,
+                            },
+                            'linear_acceleration': {
+                                'x': -float(linear_acc[2]),
+                                'y': -float(linear_acc[0]),
+                                'z': float(linear_acc[1]),
+                            }
+                        }                        
+                        # Publish directly from thread (bypasses executor)
+                        if self.imu_publisher is not None and self.imu_clock is not None:
+                            msg = Imu()
+                            msg.header.stamp = self.imu_clock.now().to_msg()
+                            msg.header.frame_id = 'zedx_front_imu_link'
+                            msg.orientation.x = imu_dict['orientation']['x']
+                            msg.orientation.y = imu_dict['orientation']['y']
+                            msg.orientation.z = imu_dict['orientation']['z']
+                            msg.orientation.w = imu_dict['orientation']['w']
+                            msg.angular_velocity.x = imu_dict['angular_velocity']['x']
+                            msg.angular_velocity.y = imu_dict['angular_velocity']['y']
+                            msg.angular_velocity.z = imu_dict['angular_velocity']['z']
+                            msg.linear_acceleration.x = imu_dict['linear_acceleration']['x']
+                            msg.linear_acceleration.y = imu_dict['linear_acceleration']['y']
+                            msg.linear_acceleration.z = imu_dict['linear_acceleration']['z']
+                            msg.orientation_covariance = [0.01, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.01]
+                            msg.angular_velocity_covariance = [0.001, 0.0, 0.0, 0.0, 0.001, 0.0, 0.0, 0.0, 0.001]
+                            msg.linear_acceleration_covariance = [0.01, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.01]
+                            self.imu_publisher.publish(msg)
+                        with self.frame_lock:
+                            self.current_imu_data = imu_dict
+            except Exception as e:
+                if self.imu_thread_running:
+                    self.logger.warn(f"IMU thread error: {e}")
+            time.sleep(period)
+
+    def stop_imu_thread(self):
+        """Stop the IMU reading thread"""
+        self.imu_thread_running = False
+        if self.imu_thread is not None:
+            self.imu_thread.join(timeout=2.0)
+
+    def get_fps(self) -> float:
+        return sum(self.fps_samples) / len(self.fps_samples) if self.fps_samples else 0.0
+
+    def get_calibration(self) -> Optional[Dict]:
+        """Get camera calibration parameters"""
+        if self.zed is None:
+            return None
+        try:
+            cam_info = self.zed.get_camera_information()
+            calib = cam_info.camera_configuration.calibration_parameters.left_cam
+            resolution = cam_info.camera_configuration.resolution
+            return {
+                'width': resolution.width,
+                'height': resolution.height,
+                'fx': calib.fx,
+                'fy': calib.fy,
+                'cx': calib.cx,
+                'cy': calib.cy,
+                'k1': calib.disto[0] if len(calib.disto) > 0 else 0.0,
+                'k2': calib.disto[1] if len(calib.disto) > 1 else 0.0,
+                'p1': calib.disto[2] if len(calib.disto) > 2 else 0.0,
+                'p2': calib.disto[3] if len(calib.disto) > 3 else 0.0,
+                'k3': calib.disto[4] if len(calib.disto) > 4 else 0.0,
+            }
+        except Exception:
+            return None
+
+    def cleanup(self):
+        """Clean up camera resources"""
+        self.stop()
+        if self.zed:
+            try:
+                self.zed.disable_object_detection()
+            except:
+                pass
+            try:
+                self.zed.disable_positional_tracking()
+            except:
+                pass
+            try:
+                self.zed.close()
+            except:
+                pass
+        self.logger.info(f"Camera {self.camera_name} cleaned up")
+
+
+# ============================================================
+# Main ROS Node
+# ============================================================
+
+class DirectZedDetectionNode(Node):
+
+    def __init__(self):
+        super().__init__('direct_zed_detection_node')
+
+        self.get_logger().info("=" * 60)
+        self.get_logger().info("Starting Direct ZED Detection Node")
+        self.get_logger().info("=" * 60)
+
+        # Declare parameters
+        self._declare_parameters()
+
+        # Load configuration
+        self.config = self._load_config()
+
+        # Determine mode
+        self.mode = self.config.get('mode', 'nav')
+        self.enable_detection = (self.mode == 'full')
+
+        self.get_logger().info(f"Mode: {self.mode}")
+        self.get_logger().info(
+            f"  Point clouds: ON | IMU: ON | Detection: {'ON' if self.enable_detection else 'OFF'}")
+
+        # Camera handlers
+        self.cameras: Dict[str, CameraHandler] = {}
+
+        # QoS profiles
+        self.reliable_qos = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.VOLATILE,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10
+        )
+
+        self.sensor_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.VOLATILE,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=5
+        )
+
+        # Setup publishers
+        self._setup_publishers()
+
+        # Initialize cameras
+        if self._setup_cameras():
+            self._start_cameras()
+
+            # Publish timer
+            publish_rate = self.config.get('publish_rate', 15.0)
+            self.publish_timer = self.create_timer(
+                1.0 / publish_rate,
+                self._publish_callback
+            )
+            # Fast IMU publish timer (100Hz, independent of main publish loop)
+            # self.imu_timer = self.create_timer(0.01, self._fast_imu_callback)  # Now published directly from IMU thread
+
+            # Status timer
+            self.status_timer = self.create_timer(10.0, self._status_callback)
+
+            self.get_logger().info("Direct ZED Detection Node initialized successfully")
+        else:
+            self.get_logger().error("Failed to initialize cameras")
+
+    def _declare_parameters(self):
+        """Declare ROS2 parameters"""
+        # Mode: nav (point clouds + IMU) or full (+ detection + images)
+        self.declare_parameter('mode', 'nav')
+
+        # Config file path
+        self.declare_parameter('config_file', '')
+
+        # Camera serial numbers
+        self.declare_parameter('camera_front_serial', 41911351)
+        self.declare_parameter('camera_left_serial', 40487925)
+        self.declare_parameter('camera_right_serial', 46311875)
+
+        # Detection model (full mode only)
+        self.declare_parameter('detection_model', 'YOLO11')
+        self.declare_parameter('yolo_model_path', '~/models/yolo11/yolo11s.onnx')
+
+        # Camera settings
+        self.declare_parameter('confidence_threshold', 50)
+        self.declare_parameter('resolution', 'SVGA')
+        self.declare_parameter('depth_mode', 'NEURAL_LIGHT')
+        self.declare_parameter('fps', 15)
+
+        # Front camera can have different settings (higher res for primary nav)
+        self.declare_parameter('front_resolution', '')
+        self.declare_parameter('front_depth_mode', '')
+
+        # Image publishing (full mode only)
+        self.declare_parameter('publish_images', True)
+        self.declare_parameter('draw_bounding_boxes', True)
+        self.declare_parameter('image_scale', 0.5)
+        self.declare_parameter('jpeg_quality', 75)
+
+        # Publish rate
+        self.declare_parameter('publish_rate', 15.0)
+
+        # Point cloud downsampling
+        self.declare_parameter('pointcloud_downsample', 4)
+
+    def _load_config(self) -> Dict[str, Any]:
+        """Load configuration from parameters"""
+        config = {
+            'mode': self.get_parameter('mode').value,
+            'cameras': {
+                'front': {
+                    'serial': self.get_parameter('camera_front_serial').value,
+                    'enabled': True
+                },
+                'left': {
+                    'serial': self.get_parameter('camera_left_serial').value,
+                    'enabled': True
+                },
+                'right': {
+                    'serial': self.get_parameter('camera_right_serial').value,
+                    'enabled': True
+                },
+            },
+            'detection_model': self.get_parameter('detection_model').value,
+            'yolo_model_path': self.get_parameter('yolo_model_path').value,
+            'confidence_threshold': self.get_parameter('confidence_threshold').value,
+            'resolution': self.get_parameter('resolution').value,
+            'depth_mode': self.get_parameter('depth_mode').value,
+            'fps': self.get_parameter('fps').value,
+            'front_resolution': self.get_parameter('front_resolution').value,
+            'front_depth_mode': self.get_parameter('front_depth_mode').value,
+            'publish_images': self.get_parameter('publish_images').value,
+            'draw_bounding_boxes': self.get_parameter('draw_bounding_boxes').value,
+            'image_scale': self.get_parameter('image_scale').value,
+            'jpeg_quality': self.get_parameter('jpeg_quality').value,
+            'publish_rate': self.get_parameter('publish_rate').value,
+            'pointcloud_downsample': self.get_parameter('pointcloud_downsample').value,
+        }
+
+        # Load from YAML config file if provided
+        config_file = self.get_parameter('config_file').value
+        if config_file and os.path.exists(config_file):
+            try:
+                with open(config_file, 'r') as f:
+                    file_config = yaml.safe_load(f)
+                    if file_config and 'direct_sdk' in file_config:
+                        config.update(file_config['direct_sdk'])
+                self.get_logger().info(f"Loaded config from {config_file}")
+            except Exception as e:
+                self.get_logger().warning(f"Failed to load config file: {e}")
+
+        return config
+
+    def _setup_publishers(self):
+        """Setup all ROS2 publishers"""
+
+        # CvBridge for image conversion
+        self.cv_bridge = CvBridge()
+
+        # === POINT CLOUD PUBLISHERS (always, RELIABLE for STVL) ===
+        self.pointcloud_publishers: Dict[str, Any] = {}
+        for cam_name in ['front', 'left', 'right']:
+            topic = f'/zedx_{cam_name}/zed_node/point_cloud/cloud_registered'
+            self.pointcloud_publishers[cam_name] = self.create_publisher(
+                PointCloud2, topic, self.reliable_qos)
+            self.get_logger().info(f"Publisher: {topic}")
+
+        # === IMU PUBLISHER (front camera only) ===
+        self.imu_publisher = self.create_publisher(
+            Imu,
+            '/zedx_front/zed_node/imu/data',
+            self.sensor_qos
+        )
+        self.get_logger().info("Publisher: /zedx_front/zed_node/imu/data")
+
+        # === COLOR IMAGE PUBLISHERS (always, compressed, RELIABLE for RViz) ===
+        self.color_publishers: Dict[str, Any] = {}
+        for cam_name in ['front', 'left', 'right']:
+            topic = f'/zedx_{cam_name}/zed_node/left/image_rect_color/compressed'
+            self.color_publishers[cam_name] = self.create_publisher(
+                CompressedImage, topic, self.reliable_qos)
+            self.get_logger().info(f"Publisher: {topic}")
+
+        # === DEPTH IMAGE PUBLISHERS (always, 16UC1 compressed, RELIABLE) ===
+        self.depth_publishers: Dict[str, Any] = {}
+        for cam_name in ['front', 'left', 'right']:
+            topic = f'/zedx_{cam_name}/zed_node/depth/depth_registered/compressedDepth'
+            self.depth_publishers[cam_name] = self.create_publisher(
+                CompressedImage, topic, self.reliable_qos)
+            self.get_logger().info(f"Publisher: {topic}")
+
+        # === CAMERA INFO PUBLISHERS (always, for RViz image display) ===
+        self.camera_info_publishers: Dict[str, Any] = {}
+        for cam_name in ['front', 'left', 'right']:
+            topic = f'/zedx_{cam_name}/zed_node/left/camera_info'
+            self.camera_info_publishers[cam_name] = self.create_publisher(
+                CameraInfo, topic, self.reliable_qos)
+            self.get_logger().info(f"Publisher: {topic}")
+
+        # Camera info cache (populated on first frame)
+        self.camera_info_cache: Dict[str, CameraInfo] = {}
+
+        # === DETECTION PUBLISHERS (full mode only) ===
+        if self.enable_detection and PERCEPTION_MSGS_AVAILABLE:
+            self.humans_publisher = self.create_publisher(
+                HumansList,
+                '/human_clustering/humans',
+                self.reliable_qos
+            )
+            self.get_logger().info("Publisher: /human_clustering/humans")
+
+            self.objects_publisher = self.create_publisher(
+                ObjectsList,
+                '/object_tracking/objects',
+                self.reliable_qos
+            )
+            self.get_logger().info("Publisher: /object_tracking/objects")
+
+            self.web_detections_pub = self.create_publisher(
+                String,
+                '/web/camera_detections',
+                self.reliable_qos
+            )
+            self.get_logger().info("Publisher: /web/camera_detections")
+
+            # Viz image publishers (with bounding boxes for web)
+            self.image_publishers: Dict[str, Any] = {}
+            if self.config.get('publish_images', True):
+                for cam_name in ['front', 'left', 'right']:
+                    topic = f'/viz/camera/zedx_{cam_name}/image_rect_color/compressed'
+                    self.image_publishers[cam_name] = self.create_publisher(
+                        CompressedImage, topic, self.sensor_qos)
+                    self.get_logger().info(f"Publisher: {topic}")
+        else:
+            self.humans_publisher = None
+            self.objects_publisher = None
+            self.web_detections_pub = None
+            self.image_publishers = {}
+
+    def _get_resolution(self, override: str = '') -> sl.RESOLUTION:
+        """Get ZED resolution enum"""
+        res_str = override if override else self.config['resolution']
+        res_map = {
+            'HD1200': sl.RESOLUTION.HD1200,
+            'HD1080': sl.RESOLUTION.HD1080,
+            'SVGA': sl.RESOLUTION.SVGA,
+        }
+        return res_map.get(res_str, sl.RESOLUTION.SVGA)
+
+    def _get_depth_mode(self, override: str = '') -> sl.DEPTH_MODE:
+        """Get ZED depth mode enum"""
+        mode_str = override if override else self.config['depth_mode']
+        mode_map = {
+            'NEURAL_LIGHT': sl.DEPTH_MODE.NEURAL_LIGHT,
+            'NEURAL': sl.DEPTH_MODE.NEURAL,
+            'NEURAL_PLUS': sl.DEPTH_MODE.NEURAL_PLUS,
+            'PERFORMANCE': sl.DEPTH_MODE.PERFORMANCE,
+            'NONE': sl.DEPTH_MODE.NONE,
+        }
+        return mode_map.get(mode_str, sl.DEPTH_MODE.NEURAL_LIGHT)
+
+    def _get_detection_model(self) -> Tuple[sl.OBJECT_DETECTION_MODEL, Optional[str]]:
+        """Get detection model type and optional ONNX path"""
+        model_name = self.config['detection_model']
+
+        model_map = {
+            'ZED_MULTI_CLASS_FAST': (sl.OBJECT_DETECTION_MODEL.MULTI_CLASS_BOX_FAST, None),
+            'ZED_MULTI_CLASS_MEDIUM': (sl.OBJECT_DETECTION_MODEL.MULTI_CLASS_BOX_MEDIUM, None),
+            'ZED_MULTI_CLASS_ACCURATE': (sl.OBJECT_DETECTION_MODEL.MULTI_CLASS_BOX_ACCURATE, None),
+            'ZED_PERSON_FAST': (sl.OBJECT_DETECTION_MODEL.PERSON_HEAD_BOX_FAST, None),
+            'ZED_PERSON_ACCURATE': (sl.OBJECT_DETECTION_MODEL.PERSON_HEAD_BOX_ACCURATE, None),
+        }
+
+        if model_name in model_map:
+            return model_map[model_name]
+
+        if 'YOLO' in model_name.upper():
+            model_path = self.config.get('yolo_model_path', '~/models/yolo11/yolo11s.onnx')
+            return (sl.OBJECT_DETECTION_MODEL.CUSTOM_YOLOLIKE_BOX_OBJECTS, model_path)
+
+        self.get_logger().warning(f"Unknown model '{model_name}', using ZED_MULTI_CLASS_MEDIUM")
+        return (sl.OBJECT_DETECTION_MODEL.MULTI_CLASS_BOX_MEDIUM, None)
+
+    def _setup_cameras(self) -> bool:
+        """Initialize all enabled cameras with staggered startup"""
+        self.get_logger().info("Initializing cameras...")
+
+        fps = self.config.get('fps', 15)
+        success_count = 0
+
+        for cam_name, cam_config in self.config['cameras'].items():
+            if not cam_config.get('enabled', True):
+                continue
+
+            serial = cam_config.get('serial', 0)
+            if serial == 0:
+                continue
+
+            # Front camera can have different resolution/depth settings
+            if cam_name == 'front':
+                resolution = self._get_resolution(self.config.get('front_resolution', ''))
+                depth_mode = self._get_depth_mode(self.config.get('front_depth_mode', ''))
+            else:
+                resolution = self._get_resolution()
+                depth_mode = self._get_depth_mode()
+
+            camera = CameraHandler(cam_name, serial, self.get_logger())
+
+            # Enable tracking only in full mode (needed for stable detection)
+            enable_tracking = self.enable_detection
+
+            if camera.setup(resolution, depth_mode, fps, enable_tracking):
+                self.cameras[cam_name] = camera
+                success_count += 1
+                self.get_logger().info(
+                    f"Camera {cam_name} initialized ({resolution}, {depth_mode})")
+            else:
+                self.get_logger().error(f"Failed to initialize camera: {cam_name}")
+
+            # Stagger camera init (2 seconds between cameras)
+            if success_count < len(self.config['cameras']):
+                time.sleep(2.0)
+
+        self.get_logger().info(
+            f"Cameras initialized: {success_count}/{len(self.config['cameras'])}")
+        return success_count > 0
+
+    def _start_cameras(self):
+        """Start capture threads on all cameras"""
+        confidence = self.config.get('confidence_threshold', 50)
+
+        if self.enable_detection:
+            model_type, model_path = self._get_detection_model()
+            self.get_logger().info(f"Detection model: {self.config['detection_model']}")
+
+        for cam_name, camera in self.cameras.items():
+            # Enable YOLO detection in full mode
+            if self.enable_detection:
+                model_type, model_path = self._get_detection_model()
+                camera.enable_detection(model_type, model_path)
+
+            # Publish IMU only from front camera
+            publish_imu = False  # IMU now handled by dedicated 100Hz thread
+
+            camera.start(
+                confidence_threshold=confidence,
+                enable_detection=self.enable_detection,
+                publish_imu=publish_imu
+            )
+            # Start dedicated high-frequency IMU thread for front camera
+            if cam_name == 'front':
+                camera.start_imu_thread(rate_hz=100.0, publisher=self.imu_publisher, clock=self.get_clock())
+
+    # ==================== PUBLISH CALLBACKS ====================
+
+    def _publish_callback(self):
+        """Main publish callback
+        
+        Priority publishing:
+          - Point clouds + IMU: every frame (~15Hz)
+          - Color images: every 5th frame (~3Hz) for RViz/web
+          - Depth images: every 10th frame (~1.5Hz) for monitoring
+        """
+        if not hasattr(self, '_publish_frame_count'):
+            self._publish_frame_count = 0
+        self._publish_frame_count += 1
+
+        publish_color = (self._publish_frame_count % 5 == 0)
+        publish_depth = (self._publish_frame_count % 10 == 0)
+
+        all_detections: List[PersonDetection] = []
+        all_objects: List[ObjectDetection] = []
+        detections_by_camera: Dict[str, List[PersonDetection]] = {}
+
+        for cam_name, camera in self.cameras.items():
+            # === POINT CLOUD (every frame, ~15Hz) ===
+            self._publish_pointcloud(cam_name, camera)
+
+            # === IMU now handled by dedicated 100Hz timer ===
+            # if cam_name == 'front':  # Now handled by _fast_imu_callback
+            #     self._publish_imu(camera)
+
+            # === COLOR IMAGE (throttled, ~3Hz) ===
+            if publish_color:
+                self._publish_color_image(cam_name, camera)
+                self._publish_camera_info(cam_name, camera)
+
+            # === DEPTH IMAGE (throttled, ~1.5Hz) ===
+            if publish_depth:
+                self._publish_depth_image(cam_name, camera)
+
+            # === DETECTION (full mode only) ===
+            if self.enable_detection:
+                detections = camera.get_detections()
+                for det in detections:
+                    det.position = self._transform_to_base_footprint(
+                        det.raw_position, cam_name)
+                detections_by_camera[cam_name] = detections
+                all_detections.extend(detections)
+
+                # Collect multi-class objects
+                objects = camera.get_objects()
+                for obj in objects:
+                    obj.position = self._transform_to_base_footprint(
+                        obj.raw_position, cam_name)
+                all_objects.extend(objects)
+
+                if self.config.get('publish_images', True) and cam_name in self.image_publishers:
+                    self._publish_image(cam_name, camera, detections)
+
+        # Publish detection results (full mode only)
+        if self.enable_detection and all_detections and self.humans_publisher:
+            self._publish_humans(all_detections)
+        if self.enable_detection and all_objects and self.objects_publisher:
+            self._publish_objects(all_objects)
+        if self.enable_detection and self.web_detections_pub:
+            self._publish_web_detections(detections_by_camera)
+
+    def _fast_imu_callback(self):
+        """High-frequency IMU publish callback (100Hz)"""
+        if 'front' in self.cameras:
+            self._publish_imu(self.cameras['front'])
+
+    def _publish_imu(self, camera: CameraHandler):
+        """Publish IMU data from front camera"""
+        imu_data = camera.get_imu_data()
+        if imu_data is None:
+            return
+
+        msg = Imu()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = 'zedx_front_imu_link'
+
+        # Orientation
+        msg.orientation.x = imu_data['orientation']['x']
+        msg.orientation.y = imu_data['orientation']['y']
+        msg.orientation.z = imu_data['orientation']['z']
+        msg.orientation.w = imu_data['orientation']['w']
+
+        # Angular velocity (rad/s)
+        msg.angular_velocity.x = imu_data['angular_velocity']['x']
+        msg.angular_velocity.y = imu_data['angular_velocity']['y']
+        msg.angular_velocity.z = imu_data['angular_velocity']['z']
+
+        # Linear acceleration (m/s²)
+        msg.linear_acceleration.x = imu_data['linear_acceleration']['x']
+        msg.linear_acceleration.y = imu_data['linear_acceleration']['y']
+        msg.linear_acceleration.z = imu_data['linear_acceleration']['z']
+
+        # Covariance (unknown = -1 for first element, or small values)
+        # Using small diagonal covariance
+        msg.orientation_covariance = [
+            0.01, 0.0, 0.0,
+            0.0, 0.01, 0.0,
+            0.0, 0.0, 0.01
+        ]
+        msg.angular_velocity_covariance = [
+            0.001, 0.0, 0.0,
+            0.0, 0.001, 0.0,
+            0.0, 0.0, 0.001
+        ]
+        msg.linear_acceleration_covariance = [
+            0.01, 0.0, 0.0,
+            0.0, 0.01, 0.0,
+            0.0, 0.0, 0.01
+        ]
+
+        self.imu_publisher.publish(msg)
+
+    def _publish_color_image(self, camera_name: str, camera: CameraHandler):
+        """Publish compressed color image"""
+        if camera_name not in self.color_publishers:
+            return
+
+        frame = camera.get_frame()
+        if frame is None:
+            return
+
+        try:
+            quality = self.config.get('jpeg_quality', 75)
+            success, compressed = cv2.imencode(
+                '.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, quality])
+
+            if success:
+                msg = CompressedImage()
+                msg.header.stamp = self.get_clock().now().to_msg()
+                msg.header.frame_id = f'zedx_{camera_name}_left_camera_frame_optical'
+                msg.format = 'jpeg'
+                msg.data = compressed.tobytes()
+                self.color_publishers[camera_name].publish(msg)
+        except Exception as e:
+            self.get_logger().warning(
+                f"Failed to publish color image {camera_name}: {e}",
+                throttle_duration_sec=5.0)
+
+    def _publish_depth_image(self, camera_name: str, camera: CameraHandler):
+        """Publish compressed depth image (32FC1 → 16UC1 PNG)"""
+        if camera_name not in self.depth_publishers:
+            return
+
+        depth = camera.get_depth()
+        if depth is None:
+            return
+
+        try:
+            # ZED depth is 32FC1 (meters). Convert to 16UC1 (millimeters) for ROS compatibility
+            # Replace NaN/Inf with 0
+            depth_clean = np.nan_to_num(depth, nan=0.0, posinf=0.0, neginf=0.0)
+            # Convert meters to millimeters, clip to 16-bit range
+            depth_mm = np.clip(depth_clean * 1000.0, 0, 65535).astype(np.uint16)
+
+            success, compressed = cv2.imencode('.png', depth_mm)
+
+            if success:
+                msg = CompressedImage()
+                msg.header.stamp = self.get_clock().now().to_msg()
+                msg.header.frame_id = f'zedx_{camera_name}_left_camera_frame_optical'
+                msg.format = 'png'
+                msg.data = compressed.tobytes()
+                self.depth_publishers[camera_name].publish(msg)
+        except Exception as e:
+            self.get_logger().warning(
+                f"Failed to publish depth image {camera_name}: {e}",
+                throttle_duration_sec=5.0)
+
+    def _publish_camera_info(self, camera_name: str, camera: CameraHandler):
+        """Publish CameraInfo for RViz image display"""
+        if camera_name not in self.camera_info_publishers:
+            return
+
+        # Use cached info if available
+        if camera_name not in self.camera_info_cache:
+            calib = camera.get_calibration()
+            if calib is None:
+                return
+
+            msg = CameraInfo()
+            msg.header.frame_id = f'zedx_{camera_name}_left_camera_frame_optical'
+            msg.width = calib['width']
+            msg.height = calib['height']
+            msg.distortion_model = 'plumb_bob'
+            msg.d = [calib['k1'], calib['k2'], calib['p1'], calib['p2'], calib['k3']]
+            msg.k = [
+                calib['fx'], 0.0, calib['cx'],
+                0.0, calib['fy'], calib['cy'],
+                0.0, 0.0, 1.0
+            ]
+            msg.r = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+            msg.p = [
+                calib['fx'], 0.0, calib['cx'], 0.0,
+                0.0, calib['fy'], calib['cy'], 0.0,
+                0.0, 0.0, 1.0, 0.0
+            ]
+            self.camera_info_cache[camera_name] = msg
+
+        info_msg = self.camera_info_cache[camera_name]
+        info_msg.header.stamp = self.get_clock().now().to_msg()
+        self.camera_info_publishers[camera_name].publish(info_msg)
+
+    def _publish_pointcloud(self, camera_name: str, camera: CameraHandler):
+        """Publish point cloud for Nav2 STVL"""
+        if camera_name not in self.pointcloud_publishers:
+            return
+
+        pc_data = camera.get_point_cloud()
+        if pc_data is None:
+            return
+
+        try:
+            downsample = self.config.get('pointcloud_downsample', 4)
+            pc_data_small = pc_data[::downsample, ::downsample, :]
+
+            points = pc_data_small[:, :, :3].reshape(-1, 3)
+            valid_mask = np.all(np.isfinite(points), axis=1)
+            valid_points = points[valid_mask]
+
+            # Transform from camera to robot coordinates
+            transformed = np.zeros_like(valid_points)
+            transformed[:, 0] = -valid_points[:, 2]  # -Z → forward
+            transformed[:, 1] = -valid_points[:, 0]  # -X → left
+            transformed[:, 2] = valid_points[:, 1]    # Y → up
+
+            # # Apply camera rotation and offset
+            # cam_transform = CAMERA_TRANSFORMS[camera_name]
+            # cam_pos = np.array(cam_transform['position'])
+            # cam_yaw = cam_transform['yaw']
+
+            # cos_yaw = np.cos(cam_yaw)
+            # sin_yaw = np.sin(cam_yaw)
+            # rotated = np.zeros_like(transformed)
+            # rotated[:, 0] = transformed[:, 0] * cos_yaw - transformed[:, 1] * sin_yaw
+            # rotated[:, 1] = transformed[:, 0] * sin_yaw + transformed[:, 1] * cos_yaw
+            # rotated[:, 2] = transformed[:, 2]
+
+            # final_points = rotated + cam_pos
+
+            # if len(final_points) == 0:
+            #     return
+
+            # header = Header()
+            # header.stamp = self.get_clock().now().to_msg()
+            # header.frame_id = 'base_footprint'
+
+            # pc_msg = point_cloud2.create_cloud_xyz32(header, final_points.tolist())
+            if len(transformed) == 0:
+                return
+
+            header = Header()
+            header.stamp = self.get_clock().now().to_msg()
+            header.frame_id = f'zedx_{camera_name}_left_camera_frame'
+
+            pc_msg = point_cloud2.create_cloud_xyz32(header, transformed.tolist())
+            self.pointcloud_publishers[camera_name].publish(pc_msg)
+
+        except Exception as e:
+            self.get_logger().warning(
+                f"Failed to publish pointcloud {camera_name}: {e}",
+                throttle_duration_sec=5.0)
+
+    # ==================== DETECTION PUBLISHERS (full mode only) ====================
+
+    def _transform_to_base_footprint(self, raw_position: List[float],
+                                     camera_name: str) -> Point:
+        """Transform from ZED camera frame to robot base_footprint"""
+        if camera_name not in CAMERA_TRANSFORMS:
+            return Point(x=raw_position[2], y=-raw_position[0], z=-raw_position[1])
+
+        cam = CAMERA_TRANSFORMS[camera_name]
+        yaw = cam['yaw']
+        cam_pos = cam['position']
+
+        rel_x = -raw_position[2]
+        rel_y = -raw_position[0]
+        rel_z = raw_position[1]
+
+        cos_yaw = np.cos(yaw)
+        sin_yaw = np.sin(yaw)
+
+        robot_x = rel_x * cos_yaw - rel_y * sin_yaw + cam_pos[0]
+        robot_y = rel_x * sin_yaw + rel_y * cos_yaw + cam_pos[1]
+        robot_z = rel_z + cam_pos[2]
+
+        return Point(x=float(robot_x), y=float(robot_y), z=float(robot_z))
+
+    def _transform_velocity(self, velocity: List[float], camera_name: str) -> List[float]:
+        """Transform velocity from ZED camera frame to base_footprint"""
+        if camera_name not in CAMERA_TRANSFORMS:
+            return [velocity[2], -velocity[0], -velocity[1]]
+
+        yaw = CAMERA_TRANSFORMS[camera_name]['yaw']
+        rel_vx = velocity[2]
+        rel_vy = -velocity[0]
+        rel_vz = -velocity[1]
+
+        cos_yaw = np.cos(yaw)
+        sin_yaw = np.sin(yaw)
+
+        return [
+            float(rel_vx * cos_yaw - rel_vy * sin_yaw),
+            float(rel_vx * sin_yaw + rel_vy * cos_yaw),
+            float(rel_vz)
+        ]
+
+    def _publish_humans(self, detections: List[PersonDetection]):
+        """Publish HumansList message"""
+        if not PERCEPTION_MSGS_AVAILABLE or not self.humans_publisher:
+            return
+
+        msg = HumansList()
+        msg.header = Header()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = 'base_footprint'
+
+        stationary_count = 0
+
+        for det in detections:
+            human = HumanTrackingData()
+            human.header = Header()
+            human.header.stamp = msg.header.stamp
+            human.header.frame_id = 'base_footprint'
+            human.position = det.position
+            human.tracking_id = det.tracking_id
+            human.distance = det.distance
+            human.confidence = det.confidence
+
+            transformed_velocity = self._transform_velocity(det.velocity, det.camera_name)
+            human.velocity = Vector3(
+                x=transformed_velocity[0],
+                y=transformed_velocity[1],
+                z=transformed_velocity[2]
+            )
+            human.velocity_magnitude = np.sqrt(
+                transformed_velocity[0]**2 +
+                transformed_velocity[1]**2 +
+                transformed_velocity[2]**2
+            )
+            human.camera_name = det.camera_name
+
+            if human.velocity_magnitude < 0.5:
+                stationary_count += 1
+
+            msg.humans.append(human)
+
+        msg.human_count = len(msg.humans)
+        msg.stationary_count = stationary_count
+        self.humans_publisher.publish(msg)
+
+    def _publish_objects(self, detections: List[ObjectDetection]):
+        """Publish ObjectsList message for all detected objects (all COCO classes)"""
+        if not PERCEPTION_MSGS_AVAILABLE or not self.objects_publisher:
+            return
+
+        msg = ObjectsList()
+        msg.header = Header()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = 'base_footprint'
+
+        for det in detections:
+            obj = ObjectTrackingData()
+            obj.tracking_id = det.tracking_id
+            obj.class_id = det.class_id
+            obj.class_name = det.class_name
+            obj.position = det.position
+            obj.confidence = det.confidence
+            obj.distance = det.distance
+
+            transformed_velocity = self._transform_velocity(det.velocity, det.camera_name)
+            obj.velocity = Vector3(
+                x=transformed_velocity[0],
+                y=transformed_velocity[1],
+                z=transformed_velocity[2]
+            )
+            obj.velocity_magnitude = np.sqrt(
+                transformed_velocity[0]**2 +
+                transformed_velocity[1]**2 +
+                transformed_velocity[2]**2
+            )
+            obj.camera_name = det.camera_name
+
+            msg.objects.append(obj)
+
+        msg.object_count = len(msg.objects)
+        self.objects_publisher.publish(msg)
+
+    def _publish_web_detections(self, detections_by_camera: Dict[str, List[PersonDetection]]):
+        """Publish detection data as JSON for web interface"""
+        if not self.web_detections_pub:
+            return
+
+        data = {}
+        for cam_name, detections in detections_by_camera.items():
+            data[cam_name] = {
+                'count': len(detections),
+                'detections': [
+                    {
+                        'label': 'PERSON',
+                        'label_id': det.tracking_id,
+                        'confidence': det.confidence,
+                        'bbox': det.bounding_box_2d,
+                        'position': {
+                            'x': det.position.x,
+                            'y': det.position.y,
+                            'z': det.position.z
+                        },
+                        'distance': det.distance
+                    }
+                    for det in detections
+                ]
+            }
+
+        msg = String()
+        msg.data = json.dumps(data)
+        self.web_detections_pub.publish(msg)
+
+    def _draw_bounding_boxes(self, frame: np.ndarray,
+                             detections: List[PersonDetection]) -> np.ndarray:
+        """Draw bounding boxes on frame"""
+        for det in detections:
+            bbox = det.bounding_box_2d
+            if len(bbox) >= 4:
+                top_left = (int(bbox[0][0]), int(bbox[0][1]))
+                bottom_right = (int(bbox[2][0]), int(bbox[2][1]))
+
+                cv2.rectangle(frame, top_left, bottom_right, (0, 255, 0), 3)
+
+                label = f"ID:{det.tracking_id} {det.distance:.1f}m {det.confidence:.0f}%"
+                label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+
+                cv2.rectangle(frame,
+                    (top_left[0], top_left[1] - label_size[1] - 10),
+                    (top_left[0] + label_size[0] + 10, top_left[1]),
+                    (0, 255, 0), -1)
+
+                cv2.putText(frame, label,
+                    (top_left[0] + 5, top_left[1] - 5),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+
+        return frame
+
+    def _publish_image(self, camera_name: str, camera: CameraHandler,
+                       detections: List[PersonDetection]):
+        """Publish compressed image with bounding boxes"""
+        frame, _ = camera.get_frame_with_boxes()
+        if frame is None:
+            return
+
+        if self.config.get('draw_bounding_boxes', True):
+            frame = self._draw_bounding_boxes(frame, detections)
+
+        scale = self.config.get('image_scale', 0.5)
+        if scale != 1.0:
+            h, w = frame.shape[:2]
+            frame = cv2.resize(frame, (int(w * scale), int(h * scale)))
+
+        quality = self.config.get('jpeg_quality', 75)
+        success, compressed = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, quality])
+
+        if success:
+            msg = CompressedImage()
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.header.frame_id = f'zedx_{camera_name}_left_camera_frame_optical'
+            msg.format = 'jpeg'
+            msg.data = compressed.tobytes()
+            self.image_publishers[camera_name].publish(msg)
+
+    # ==================== STATUS ====================
+
+    def _status_callback(self):
+        """Periodic status logging"""
+        total_fps = 0.0
+        total_detections = 0
+        status_parts = []
+
+        for cam_name, camera in self.cameras.items():
+            fps = camera.get_fps()
+            total_fps += fps
+            det_count = len(camera.get_detections())
+            total_detections += det_count
+            errors = camera.grab_errors
+            status_parts.append(
+                f"{cam_name}:{fps:.0f}fps" +
+                (f",{errors}err" if errors > 0 else ""))
+
+        avg_fps = total_fps / len(self.cameras) if self.cameras else 0
+        mode_str = f"[{self.mode.upper()}]"
+        det_str = f", {total_detections} persons" if self.enable_detection else ""
+
+        self.get_logger().info(
+            f"{mode_str} {len(self.cameras)} cams, avg {avg_fps:.0f}fps{det_str} "
+            f"| {' | '.join(status_parts)}")
+
+    def destroy_node(self):
+        """Clean up on shutdown"""
+        self.get_logger().info("Shutting down Direct ZED Detection Node...")
+        for cam_name, camera in self.cameras.items():
+            camera.cleanup()
+        super().destroy_node()
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = DirectZedDetectionNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()

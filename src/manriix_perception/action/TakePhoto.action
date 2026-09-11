@@ -1,0 +1,15 @@
+# Goal
+int32 group_size
+float32 requested_duration
+---
+# Result
+int32 photos_taken
+float32 actual_duration
+bool interrupted
+string stop_reason
+---
+# Feedback
+float32 elapsed_time
+int32 current_group_size
+string formation_type
+float32 calculated_duration

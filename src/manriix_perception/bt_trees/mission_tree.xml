@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Manriix Mission Behavior Tree (v5 — updaters in pre-tick)
+  ==========================================================
+  Blackboard updated by mission_controller_cpp.cpp BEFORE each tick.
+  Tree is pure decision logic — 11 nodes.
+-->
+<root BTCPP_format="4">
+
+  <TreeNodesModel>
+    <Condition ID="EvaluateTarget">
+      <input_port name="teleop_paused" type="bool" default="false"/>
+      <input_port name="recovery_lock" type="bool" default="false"/>
+      <input_port name="recovery_cooldown_until" type="double" default="0.0"/>
+      <input_port name="camera_active" type="bool" default="false"/>
+      <input_port name="available_targets" type="string" default="[]"/>
+      <input_port name="robot_position" type="string" default=""/>
+      <output_port name="current_target" type="string"/>
+      <inout_port name="recently_photographed" type="string" default="{}"/>
+    </Condition>
+    <Action ID="NavigateMultiPOI">
+      <input_port name="current_target" type="string"/>
+      <input_port name="all_pois" type="string" default="[]"/>
+      <input_port name="robot_position" type="string"/>
+      <input_port name="max_poi_retries" type="int" default="5"/>
+      <input_port name="arrival_threshold" type="double" default="0.5"/>
+      <input_port name="per_goal_timeout" type="double" default="60.0"/>
+      <input_port name="abs_nav_timeout" type="double" default="180.0"/>
+      <output_port name="failed_positions" type="string"/>
+    </Action>
+    <Action ID="WaitForStability">
+      <input_port name="robot_position" type="string"/>
+      <input_port name="stability_threshold" type="double" default="0.05"/>
+      <input_port name="stability_wait_time" type="double" default="2.0"/>
+      <input_port name="timeout_sec" type="double" default="30.0"/>
+    </Action>
+    <Action ID="TakePhotoAction">
+      <input_port name="group_size" type="int" default="0"/>
+      <input_port name="requested_duration" type="double" default="0.0"/>
+      <input_port name="current_target" type="string" default="{}"/>
+      <input_port name="robot_position" type="string" default="{}"/>
+      <inout_port name="recently_photographed" type="string" default="{}"/>
+      <inout_port name="camera_active" type="bool" default="false"/>
+      <output_port name="photos_taken" type="int"/>
+      <output_port name="last_successful_position" type="string"/>
+    </Action>
+    <Action ID="WaitForHumans">
+      <input_port name="available_targets" type="string"/>
+      <input_port name="teleop_paused" type="bool" default="false"/>
+      <input_port name="recovery_lock" type="bool" default="false"/>
+      <input_port name="wait_duration_sec" type="double" default="60.0"/>
+    </Action>
+    <Action ID="SpinAndScan">
+      <input_port name="available_targets" type="string"/>
+      <input_port name="teleop_paused" type="bool" default="false"/>
+      <input_port name="recovery_lock" type="bool" default="false"/>
+      <input_port name="scan_timeout_sec" type="double" default="30.0"/>
+    </Action>
+    <Action ID="ReturnToLastPosition">
+      <input_port name="last_successful_position" type="string"/>
+      <input_port name="available_targets" type="string"/>
+      <input_port name="teleop_paused" type="bool" default="false"/>
+      <input_port name="recovery_lock" type="bool" default="false"/>
+      <input_port name="nav_timeout_sec" type="double" default="90.0"/>
+    </Action>
+    <Condition ID="RecoveryIdle">
+      <input_port name="available_targets" type="string"/>
+      <input_port name="teleop_paused" type="bool" default="false"/>
+      <input_port name="recovery_lock" type="bool" default="false"/>
+    </Condition>
+  </TreeNodesModel>
+
+  <BehaviorTree ID="MissionTree">
+    <Repeat num_cycles="-1">
+      <Fallback name="MissionOrRecover">
+
+        <Sequence name="MissionSequence">
+          <EvaluateTarget
+            teleop_paused="{teleop_paused}"
+            recovery_lock="{recovery_lock}"
+            recovery_cooldown_until="{recovery_cooldown_until}"
+            camera_active="{camera_active}"
+            available_targets="{available_targets}"
+            robot_position="{robot_position}"
+            current_target="{current_target}"
+            recently_photographed="{recently_photographed}"/>
+          <NavigateMultiPOI
+            current_target="{current_target}"
+            all_pois="{all_pois}"
+            robot_position="{robot_position}"
+            max_poi_retries="5"
+            arrival_threshold="0.5"
+            per_goal_timeout="60.0"
+            abs_nav_timeout="180.0"
+            failed_positions="{failed_positions}"/>
+          <WaitForStability
+            robot_position="{robot_position}"
+            stability_threshold="0.05"
+            stability_wait_time="2.0"
+            timeout_sec="30.0"/>
+          <TakePhotoAction
+            group_size="0"
+            requested_duration="0.0"
+            current_target="{current_target}"
+            robot_position="{robot_position}"
+            recently_photographed="{recently_photographed}"
+            camera_active="{camera_active}"
+            photos_taken="{photos_taken}"
+            last_successful_position="{last_successful_position}"/>
+        </Sequence>
+
+        <Fallback name="RecoverySelector">
+          <WaitForHumans
+            available_targets="{available_targets}"
+            teleop_paused="{teleop_paused}"
+            recovery_lock="{recovery_lock}"
+            wait_duration_sec="60.0"/>
+          <SpinAndScan
+            available_targets="{available_targets}"
+            teleop_paused="{teleop_paused}"
+            recovery_lock="{recovery_lock}"
+            scan_timeout_sec="30.0"/>
+          <ReturnToLastPosition
+            last_successful_position="{last_successful_position}"
+            available_targets="{available_targets}"
+            teleop_paused="{teleop_paused}"
+            recovery_lock="{recovery_lock}"
+            nav_timeout_sec="90.0"/>
+          <RecoveryIdle
+            available_targets="{available_targets}"
+            teleop_paused="{teleop_paused}"
+            recovery_lock="{recovery_lock}"/>
+        </Fallback>
+
+      </Fallback>
+    </Repeat>
+  </BehaviorTree>
+
+</root>

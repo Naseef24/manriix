@@ -396,10 +396,19 @@ class OptimizedOperations:
         self.use_gpu = use_gpu and CUPY_AVAILABLE
         self.node = node
         
+        # Size threshold: GPU only when array is large enough to offset transfer cost
+        self.gpu_min_points = 30
+        
         if self.use_jit:
             self.jit_compiler = JITCompiler(use_gpu=use_gpu, node=node)
         else:
             self.jit_compiler = None
+        
+        if self.node:
+            self.node.get_logger().info(
+                f"OptimizedOperations: JIT={self.use_jit}, GPU={self.use_gpu}, "
+                f"GPU threshold={self.gpu_min_points} points"
+            )
         
         # Performance tracking
         self.operation_times = {}
@@ -408,6 +417,7 @@ class OptimizedOperations:
     def compute_distances(self, points: np.ndarray, center: np.ndarray) -> np.ndarray:
         """
         Compute distances with best available method
+        Priority: GPU (large arrays) > JIT > NumPy
         
         Args:
             points: Nx3 array of points
@@ -418,13 +428,24 @@ class OptimizedOperations:
         """
         start_time = time.time()
         
-        if self.use_jit and self.jit_compiler:
+        if self.use_gpu and len(points) >= self.gpu_min_points:
+            # GPU path — worth the transfer cost at this size
+            try:
+                points_gpu = cp.asarray(points, dtype=cp.float32)
+                center_gpu = cp.asarray(center, dtype=cp.float32)
+                diff = points_gpu - center_gpu
+                result = cp.sqrt(cp.sum(diff ** 2, axis=1)).get()
+            except Exception as e:
+                if self.node:
+                    self.node.get_logger().debug(f"GPU compute_distances failed, falling back: {e}")
+                result = np.linalg.norm(points - center, axis=1)
+        elif self.use_jit and self.jit_compiler:
             result = self.jit_compiler.compute_distances_jit(
                 points.astype(np.float32), 
                 center.astype(np.float32)
             )
         else:
-            # Fallback to NumPy
+            # NumPy fallback — fastest for small arrays
             result = np.linalg.norm(points - center, axis=1)
         
         self._track_performance('compute_distances', time.time() - start_time)
@@ -443,14 +464,17 @@ class OptimizedOperations:
         """
         start_time = time.time()
         
-        if self.use_gpu and CUPY_AVAILABLE:
-            # GPU implementation
-            points1_gpu = cp.asarray(points1)
-            points2_gpu = cp.asarray(points2)
-            
-            # Broadcasting on GPU
-            diff = points1_gpu[:, np.newaxis, :] - points2_gpu[np.newaxis, :, :]
-            result = cp.sqrt(cp.sum(diff ** 2, axis=2)).get()
+        if self.use_gpu and CUPY_AVAILABLE and len(points1) >= self.gpu_min_points:
+            # GPU implementation — only for large arrays
+            try:
+                points1_gpu = cp.asarray(points1, dtype=cp.float32)
+                points2_gpu = cp.asarray(points2, dtype=cp.float32)
+                diff = points1_gpu[:, cp.newaxis, :] - points2_gpu[cp.newaxis, :, :]
+                result = cp.sqrt(cp.sum(diff ** 2, axis=2)).get()
+            except Exception as e:
+                if self.node:
+                    self.node.get_logger().debug(f"GPU pairwise failed, falling back: {e}")
+                result = np.linalg.norm(points1[:, np.newaxis] - points2[np.newaxis, :], axis=2)
             
         elif self.use_jit and self.jit_compiler:
             # JIT-compiled CPU

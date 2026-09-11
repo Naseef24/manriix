@@ -50,7 +50,7 @@ amcl:
     z_max: 0.05
     z_rand: 0.6 #0.5
     z_short: 0.05 #0.005 default, but can be increased to 0.1 to better handle short-range noise from ZED cameras
-    scan_topic: scan
+    scan_topic: scan #scan_combined 
     set_initial_pose: false
     initial_pose:
       x: 1.109
@@ -63,7 +63,7 @@ bt_navigator:
     use_sim_time: False
     global_frame: map
     robot_base_frame: base_footprint
-    odom_topic: /odometry/filtered
+    odom_topic: /odometry/filtered # /visual_slam/tracking/odometry
     bt_loop_duration: 10
     default_server_timeout: 20
     # [FIX #9] Updated BTs with sane retry counts and path validity
@@ -135,7 +135,7 @@ controller_server:
     progress_checker_plugin: "progress_checker"
     goal_checker_plugins: ["general_goal_checker"]
     controller_plugins: ["FollowPath"]
-    odom_topic: "/odometry/filtered"
+    odom_topic: "/odometry/filtered" # "/visual_slam/tracking/odometry"
 
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
@@ -205,7 +205,7 @@ local_costmap:
         z_voxels: 16
         max_obstacle_height: 2.0
         mark_threshold: 0
-        observation_sources: scan
+        observation_sources: scan #scan_rear
         scan:
           topic: /scan
           max_obstacle_height: 2.0
@@ -215,6 +215,17 @@ local_costmap:
           data_type: "LaserScan"
           raytrace_max_range: 3.0
           raytrace_min_range: 0.3
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+        scan_rear:
+          topic: /scan_rear
+          max_obstacle_height: 2.0
+          min_obstacle_height: 0.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.2
           obstacle_max_range: 2.5
           obstacle_min_range: 0.0
 
@@ -236,7 +247,8 @@ local_costmap:
         map_save_duration: 60.0
         
         # [FIX #4] All three ZED cameras for 360° 3D obstacle detection
-        observation_sources: front_mark front_clear #left_mark left_clear right_mark right_clear
+        # observation_sources: front_mark front_clear rear_mark rear_clear #left_mark left_clear right_mark right_clear
+        observation_sources: front_mark front_clear oak_mark oak_clear #left_mark left_clear right_mark right_clear
         
         # --- FRONT CAMERA (unchanged) ---
         front_mark:
@@ -322,10 +334,66 @@ local_costmap:
           decay_acceleration: 5.0
           model_type: 0
 
+        # --- REAR CAMERA (D455 — NEW) ---
+        rear_mark:
+          data_type: PointCloud2
+          topic: /camera/camera/depth/color/points
+          marking: true
+          clearing: false
+          obstacle_range: 3.0
+          min_obstacle_height: 0.1
+          max_obstacle_height: 2.0
+          expected_update_rate: 0.0
+          observation_persistence: 0.0
+          inf_is_valid: false
+          filter: "passthrough"
+          voxel_min_points: 0
+          clear_after_reading: true
+
+        rear_clear:
+          data_type: PointCloud2
+          topic: /camera/camera/depth/color/points
+          marking: false
+          clearing: true
+          min_z: 0.1
+          max_z: 2.0
+          vertical_fov_angle: 0.80
+          horizontal_fov_angle: 1.52
+          decay_acceleration: 5.0
+          model_type: 0
+
+        # --- OAK-D Pro Low Level (NEW) ---
+        oak_mark:
+          data_type: PointCloud2
+          topic: /oak_d_pro_w/points
+          marking: true
+          clearing: false
+          obstacle_range: 3.0          # Set to 3m for low-level precision
+          min_obstacle_height: 0.1    # Detect small floor obstacles (5cm)
+          max_obstacle_height: 1.0     # Ignore objects above 1m
+          expected_update_rate: 0.0
+          observation_persistence: 0.0
+          inf_is_valid: false
+          filter: "passthrough"
+          voxel_min_points: 2          # Filter out noise
+          clear_after_reading: true
+
+        oak_clear:
+          data_type: PointCloud2
+          topic: /oak_d_pro_w/points
+          marking: false
+          clearing: true
+          min_z: 0.1
+          max_z: 3.0
+          vertical_fov_angle: 0.94     # OAK-D Pro W FOV (approx 54° vertical)
+          horizontal_fov_angle: 1.55   # OAK-D Pro W FOV (approx 89° horizontal)
+          decay_acceleration: 5.0
+          model_type: 0
+
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 2.5
-        inflation_radius: 0.80
+        cost_scaling_factor: 3.5 #2.5
+        inflation_radius: 0.45 #0.80
 
       always_send_full_costmap: True
 
@@ -361,9 +429,9 @@ global_costmap:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: True
         footprint_clearing_enabled: true
-        observation_sources: scan
+        observation_sources: scan #scan_rear
         scan:
-          topic: /scan
+          topic: /scan 
           max_obstacle_height: 2.0
           min_obstacle_height: 0.0
           clearing: True
@@ -371,6 +439,17 @@ global_costmap:
           data_type: "LaserScan"
           raytrace_max_range: 3.0
           raytrace_min_range: 0.3
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+        scan_rear:
+          topic: /scan_rear
+          max_obstacle_height: 2.0
+          min_obstacle_height: 0.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.2
           obstacle_max_range: 2.5
           obstacle_min_range: 0.0
 
@@ -480,8 +559,8 @@ global_costmap:
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 2.5
-        inflation_radius: 0.80
+        cost_scaling_factor: 3.5 #2.5
+        inflation_radius: 0.45 #0.80
 
       always_send_full_costmap: True
 
@@ -549,9 +628,9 @@ behavior_server:
     transform_tolerance: 0.3
     use_sim_time: false
     simulate_ahead_time: 2.0
-    max_rotational_vel: 1.0 #0.8
+    max_rotational_vel: 0.8 #1.0 #0.8
     min_rotational_vel: 0.3 #0.2
-    rotational_acc_lim: 1.5 #0.8
+    rotational_acc_lim: 1.2 #1.5 #0.8
 
 # ============================================================================
 # COLLISION MONITOR
@@ -605,7 +684,9 @@ collision_monitor:
     
     # [FIX #5] All three cameras + RPLidar for 360° collision detection
     # observation_sources: ["scan", "pointcloud_front", "pointcloud_left", "pointcloud_right"]
-    observation_sources: ["scan", "pointcloud_front"]
+    # observation_sources: ["scan", "pointcloud_front"]
+    # observation_sources: ["scan", "scan_rear", "pointcloud_front", "pointcloud_rear", "oak_source"]
+    observation_sources: ["scan", "pointcloud_front", "oak_source"]
     
     scan:
       type: "scan"
@@ -637,6 +718,28 @@ collision_monitor:
       max_height: 2.0
       enabled: True
 
+    scan_rear:
+      type: "scan"
+      topic: "/scan_rear"
+      min_height: 0.1
+      max_height: 2.0
+      enabled: True
+
+    pointcloud_rear:
+      type: "pointcloud"
+      topic: "/camera/camera/depth/color/points"
+      min_height: 0.1
+      max_height: 2.0
+      enabled: True
+
+    oak_source:
+      type: "pointcloud"
+      topic: "/oak_d_pro_w/points"
+      min_height: 0.1         # Detect low obstacles
+      max_height: 1.0
+      # Ensure this is set to Best Effort to match your publisher
+      reliability_policy: "best_effort" 
+      
 velocity_smoother:
   ros__parameters:
     use_sim_time: False
@@ -655,7 +758,7 @@ velocity_smoother:
     min_velocity: [-0.0, 0.0, -1.0]
     max_accel: [0.5, 0.0, 2.0]          # angular accel: 1.2 → 2.0
     max_decel: [-0.8, 0.0, -2.5]        # angular decel: 1.5 → 2.5
-    odom_topic: "odometry/filtered"
+    odom_topic:  "odometry/filtered" # "visual_slam/tracking/odometry"
     odom_duration: 0.1
     # deadband_velocity: [0.01, 0.0, 0.01]
     deadband_velocity: [0.01, 0.0, 0.05] # angular deadband: 0.01 → 0.15

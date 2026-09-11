@@ -39,7 +39,7 @@ from typing import Dict, List, Optional, Any, Tuple
 
 # ROS message types
 try:
-    from manriix_perception.msg import HumansList, HumanTrackingData
+    from manriix_perception.msg import HumansList, HumanTrackingData, ObjectsList, ObjectTrackingData
     from sensor_msgs.msg import CompressedImage, CameraInfo
     from geometry_msgs.msg import Point, Vector3
     MSGS_AVAILABLE = True
@@ -66,13 +66,17 @@ class PhotoCaptureBridge(Node):
         self.mqtt_host = self.get_parameter('mqtt_host').value
         self.mqtt_port = self.get_parameter('mqtt_port').value
         self.mqtt_topic = self.get_parameter('mqtt_topic').value
+        self.publish_objects = self.get_parameter('publish_objects').value
+        self.mqtt_objects_topic = self.get_parameter('mqtt_objects_topic').value
         self.sync_enabled = self.get_parameter('sync_enabled').value
         self.sync_window = self.get_parameter('sync_window').value
         self.cameras = self.get_parameter('cameras').value
         
         self.get_logger().info(f"MQTT: {'enabled' if self.mqtt_enabled else 'disabled'}")
         self.get_logger().info(f"  Host: {self.mqtt_host}:{self.mqtt_port}")
-        self.get_logger().info(f"  Topic: {self.mqtt_topic}")
+        self.get_logger().info(f"  Humans topic: {self.mqtt_topic}")
+        if self.publish_objects:
+            self.get_logger().info(f"  Objects topic: {self.mqtt_objects_topic}")
         self.get_logger().info(f"Sync: {'enabled' if self.sync_enabled else 'disabled'}")
         if self.sync_enabled:
             self.get_logger().info(f"  Window: {self.sync_window}s")
@@ -94,8 +98,12 @@ class PhotoCaptureBridge(Node):
             'detections_received': 0,
             'detections_enhanced': 0,
             'mqtt_published': 0,
+            'objects_received': 0,       # NEW: multi-class objects count
+            'objects_enhanced': 0,       # NEW: multi-class objects processed
+            'mqtt_objects_published': 0, # NEW: objects messages published
             'depth_cache_updates': 0,
             'last_publish_time': 0.0,
+            'last_objects_publish_time': 0.0,  # NEW
         }
 
         # Setup ROS subscribers
@@ -112,6 +120,10 @@ class PhotoCaptureBridge(Node):
         self.declare_parameter('mqtt_host', 'localhost')
         self.declare_parameter('mqtt_port', 1883)
         self.declare_parameter('mqtt_topic', '/photo_capture/tracking_results')
+        
+        # Multi-class detection support (NEW)
+        self.declare_parameter('publish_objects', True)  # Enable multi-class forwarding
+        self.declare_parameter('mqtt_objects_topic', '/photo_capture/objects_tracking')
         
         # 3-camera synchronization
         self.declare_parameter('sync_enabled', True)
@@ -157,6 +169,16 @@ class PhotoCaptureBridge(Node):
             reliable_qos
         )
         self.get_logger().info("Subscribed: /human_clustering/humans")
+
+        # Subscribe to multi-class object detections (NEW)
+        if self.publish_objects:
+            self.objects_sub = self.create_subscription(
+                ObjectsList,
+                '/object_tracking/objects',
+                self._objects_callback,
+                reliable_qos
+            )
+            self.get_logger().info("Subscribed: /object_tracking/objects")
 
         # Subscribe to depth images (for depth_mean calculation)
         for cam_name in self.cameras:
@@ -204,6 +226,29 @@ class PhotoCaptureBridge(Node):
         # Publish to MQTT
         if self.mqtt_enabled and mqtt_msg:
             self._publish_mqtt(mqtt_msg)
+
+    def _objects_callback(self, msg: ObjectsList):
+        """Callback for multi-class object detections (NEW)"""
+        if not msg.objects:
+            return  # No detections
+        
+        self.stats['objects_received'] += len(msg.objects)
+        
+        # Group detections by camera
+        objects_by_camera = self._group_objects_by_camera(msg.objects)
+        
+        # Enhance each detection with depth_mean
+        enhanced = self._add_depth_info_objects(objects_by_camera)
+        
+        # Add camera_matrix to each detection
+        enhanced = self._add_camera_matrix(enhanced)
+        
+        # Build MQTT message
+        mqtt_msg = self._build_objects_mqtt_message(enhanced, msg.header.stamp)
+        
+        # Publish to MQTT
+        if self.mqtt_enabled and mqtt_msg:
+            self._publish_mqtt_objects(mqtt_msg)
 
     def _depth_callback(self, msg: CompressedImage, camera_name: str):
         """Receive and cache depth images"""
@@ -277,6 +322,38 @@ class PhotoCaptureBridge(Node):
         
         return dict(grouped)
 
+    def _group_objects_by_camera(self, objects: List[ObjectTrackingData]) -> Dict[str, List]:
+        """Group multi-class object detections by camera name (NEW)"""
+        grouped = defaultdict(list)
+        
+        for obj in objects:
+            cam_name = obj.camera_name
+            
+            # Convert to dict for easier manipulation (includes class info)
+            detection = {
+                'tracking_id': obj.tracking_id,
+                'class_id': obj.class_id,         # NEW: COCO class ID
+                'class_name': obj.class_name,     # NEW: Human-readable name
+                'position': {
+                    'x': obj.position.x,
+                    'y': obj.position.y,
+                    'z': obj.position.z,
+                },
+                'confidence': obj.confidence,
+                'distance': obj.distance,
+                'velocity': {
+                    'x': obj.velocity.x,
+                    'y': obj.velocity.y,
+                    'z': obj.velocity.z,
+                },
+                'velocity_magnitude': obj.velocity_magnitude,
+                'camera_name': cam_name,
+            }
+            
+            grouped[cam_name].append(detection)
+        
+        return dict(grouped)
+
     def _add_depth_info(self, detections_by_camera: Dict[str, List]) -> Dict[str, List]:
         """Add depth_mean to each detection using cached depth images"""
         enhanced = {}
@@ -308,6 +385,35 @@ class PhotoCaptureBridge(Node):
                 self.stats['detections_enhanced'] += 1
             
             enhanced[cam_name] = enhanced_dets
+        
+        return enhanced
+
+    def _add_depth_info_objects(self, objects_by_camera: Dict[str, List]) -> Dict[str, List]:
+        """Add depth_mean to multi-class objects using cached depth images (NEW)"""
+        enhanced = {}
+        
+        for cam_name, objects in objects_by_camera.items():
+            enhanced_objs = []
+            
+            # Get cached depth image for this camera
+            depth_img = self.depth_cache.get(cam_name)
+            
+            for obj in objects:
+                # Start with existing object
+                enhanced_obj = obj.copy()
+                
+                # Use distance as depth_mean fallback
+                depth_mean = obj['distance']
+                
+                # TODO: Calculate from bbox_2d if available
+                # if depth_img is not None and 'bbox_2d' in obj:
+                #     depth_mean = self._calculate_depth_mean(depth_img, obj['bbox_2d'])
+                
+                enhanced_obj['depth_mean'] = depth_mean
+                enhanced_objs.append(enhanced_obj)
+                self.stats['objects_enhanced'] += 1
+            
+            enhanced[cam_name] = enhanced_objs
         
         return enhanced
 
@@ -379,6 +485,23 @@ class PhotoCaptureBridge(Node):
         
         return msg
 
+    def _build_objects_mqtt_message(self, objects_by_camera: Dict[str, List], 
+                                    timestamp) -> Optional[Dict]:
+        """Build MQTT message for multi-class objects (NEW)"""
+        if not objects_by_camera:
+            return None
+        
+        # Convert ROS timestamp to float
+        ros_time = timestamp.sec + timestamp.nanosec / 1e9
+        
+        msg = {
+            'timestamp': ros_time,
+            'cameras': objects_by_camera,
+            'total_detections': sum(len(objs) for objs in objects_by_camera.values()),
+        }
+        
+        return msg
+
     # ==================== MQTT PUBLISHING ====================
 
     def _publish_mqtt(self, msg: Dict):
@@ -409,20 +532,47 @@ class PhotoCaptureBridge(Node):
                 throttle_duration_sec=5.0
             )
 
+    def _publish_mqtt_objects(self, msg: Dict):
+        """Publish multi-class objects message to MQTT (NEW)"""
+        if not self.mqtt_client:
+            return
+        
+        try:
+            payload = json.dumps(msg)
+            result = self.mqtt_client.publish(
+                self.mqtt_objects_topic,
+                payload,
+                qos=0  # Fire-and-forget for low latency
+            )
+            
+            if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                self.stats['mqtt_objects_published'] += 1
+                self.stats['last_objects_publish_time'] = time.time()
+            else:
+                self.get_logger().warning(
+                    f"MQTT objects publish failed: {result.rc}",
+                    throttle_duration_sec=5.0
+                )
+                
+        except Exception as e:
+            self.get_logger().error(
+                f"MQTT objects publish exception: {e}",
+                throttle_duration_sec=5.0
+            )
+
     # ==================== STATUS ====================
 
     def _status_callback(self):
         """Periodic status logging"""
         age = time.time() - self.stats['last_publish_time'] if self.stats['last_publish_time'] > 0 else 0
+        objects_age = time.time() - self.stats['last_objects_publish_time'] if self.stats['last_objects_publish_time'] > 0 else 0
         
         self.get_logger().info(
             f"[BRIDGE] "
-            f"Received: {self.stats['detections_received']} | "
-            f"Enhanced: {self.stats['detections_enhanced']} | "
-            f"Published: {self.stats['mqtt_published']} | "
+            f"Humans: {self.stats['detections_received']} rx, {self.stats['mqtt_published']} pub ({age:.1f}s ago) | "
+            f"Objects: {self.stats['objects_received']} rx, {self.stats['mqtt_objects_published']} pub ({objects_age:.1f}s ago) | "
             f"Depth updates: {self.stats['depth_cache_updates']} | "
-            f"Cameras cached: {len(self.camera_info_cache)}/3 | "
-            f"Last publish: {age:.1f}s ago"
+            f"Cameras: {len(self.camera_info_cache)}/3"
         )
 
     def destroy_node(self):

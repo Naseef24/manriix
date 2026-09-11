@@ -1,0 +1,81 @@
+"""
+oak_camera.launch.py
+
+Replaces depthai_ros_driver's pointcloud.launch.py for our pipeline.
+
+Why: that launch wires depth_image_proc::PointCloudXyziNode, which
+time-syncs THREE topics (right intensity image + depth + camera_info).
+With depth now aligned to the RGB socket (required so the on-device
+spatial NN's bounding boxes map to depth correctly), the right-camera
+intensity stream no longer syncs with the depth stream and the
+pointcloud silently stops.
+
+We don't need intensity -- this launch runs the driver plus a plain
+depth_image_proc::PointCloudXyzNode consuming only the RGB-aligned
+depth + its camera_info, publishing /oak/points as before. Downstream
+nodes are unaffected (frame_id is read dynamically).
+"""
+
+import os
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch_ros.actions import ComposableNodeContainer
+from launch_ros.descriptions import ComposableNode
+
+
+def generate_launch_description():
+    pkg_share = get_package_share_directory('manriix_oak_obstacles')
+    depthai_prefix = get_package_share_directory('depthai_ros_driver')
+
+    camera_params = os.path.join(pkg_share, 'config', 'oak_camera_params.yaml')
+
+    return LaunchDescription([
+
+        # IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource(
+        #         os.path.join(depthai_prefix, 'launch', 'camera.launch.py')),
+        #     launch_arguments={
+        #         'name': 'oak',
+        #         'params_file': camera_params,
+        #     }.items(),
+        # ),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(depthai_prefix, 'launch', 'camera.launch.py')),
+            launch_arguments={
+                'name': 'oak',
+                'params_file': camera_params,
+                'publish_tf_from_calibration': 'false',
+                'imu_from_descr': 'false',
+                'override_cam_model': 'false',
+                'use_base_descr': 'false',
+                'rs_compat': 'false',
+                # You can also fix parent_frame/base_frame to match manriix3.urdf if needed:
+                # 'parent_frame': 'oak_d_pro_w', or 'base_link', depending on your TF design
+                # 'base_frame': 'oak_d_pro_w_rgb_camera_frame', etc.
+            }.items(),
+        ),
+
+        ComposableNodeContainer(
+            name='manriix_pcl_container',
+            namespace='',
+            package='rclcpp_components',
+            executable='component_container',
+            composable_node_descriptions=[
+                ComposableNode(
+                    package='depth_image_proc',
+                    plugin='depth_image_proc::PointCloudXyzNode',
+                    name='point_cloud_xyz',
+                    remappings=[
+                        ('image_rect', '/oak/stereo/image_raw'),
+                        ('camera_info', '/oak/stereo/camera_info'),
+                        ('points', '/oak/points'),
+                    ],
+                ),
+            ],
+            output='screen',
+        ),
+    ])

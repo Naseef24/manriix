@@ -1,0 +1,113 @@
+# PRODUCTION pipeline params.
+# Differences vs pipeline_params.yaml (dev):
+#   - all camera topics/frames use the URDF-consistent 'oak_d_pro_w' name
+#   - obstacle cloud published in base_footprint (STVL measures
+#     obstacle_range/frustum from the cloud's frame origin)
+#   - TF comes from cuVSLAM (map->odom->base_footprint) + URDF/RSP
+#     (base_footprint->...->oak_d_pro_w_rgb_camera_optical_frame);
+#     the pipeline publishes NO transforms.
+# NOTE: numeric tuning below mirrors the dev config at time of writing —
+# port any newer on-robot tuning before deploying.
+
+pointcloud_filter_node:
+  ros__parameters:
+    input_topic: /oak_d_pro_w/points
+    output_dense_topic: /manriix/points_dense
+    output_filtered_topic: /manriix/points_filtered
+    target_frame: base_footprint
+
+    l_d: 3.0
+    l_g: 0.1
+    l_h: 1.0
+    l_l: 0.05
+    l_n: 30
+    l_r: 0.5
+
+    focal_px: 386.0            # verify: k[0] of /oak_d_pro_w/stereo/camera_info
+    baseline_m: 0.075
+    disparity_sigma_px: 0.5
+    ground_margin_k: 3.0
+    max_input_points: 60000
+
+cluster_tracking_node:
+  ros__parameters:
+    input_topic: /manriix/points_filtered
+    output_tracks_topic: /manriix/cluster_tracks
+    output_markers_topic: /manriix/cluster_markers
+    dbscan_eps: 0.3
+    dbscan_min_samples: 15
+    min_cluster_points: 15
+    track_max_assoc_dist: 0.6
+    track_timeout: 1.0
+    min_hits_to_confirm: 3
+
+static_dynamic_classifier_node:
+  ros__parameters:
+    dense_topic: /manriix/points_dense
+    tracks_topic: /manriix/cluster_tracks
+    camera_info_topic: /oak_d_pro_w/stereo/camera_info
+    camera_frame: oak_d_pro_w_rgb_camera_optical_frame
+    map_frame: base_footprint
+
+    output_tracks_topic: /manriix/cluster_tracks_classified
+    output_markers_topic: /manriix/classification_markers
+
+    delta: 0.4
+    tau: 0.4
+    l_NN: 0.45
+    l_abs_dyn: 100
+    l_rel_dyn: 0.8
+    occlusion_pixel_radius: 4.0
+    occlusion_depth_margin: 0.05
+    buffer_horizon: 1.5
+    max_proj_points: 6000
+
+people_tracker_node:
+  ros__parameters:
+    detections_topic: /oak_d_pro_w/nn/spatial_detections
+    output_topic: /manriix/person_boxes
+    target_frame: base_footprint
+    confidence_threshold: 0.5
+    max_assoc_dist: 0.7
+    box_timeout: 0.7
+    min_hits_to_confirm: 2
+
+fusion_node:
+  ros__parameters:
+    tracks_topic: /manriix/cluster_tracks_classified
+    person_boxes_topic: /manriix/person_boxes
+    output_tracks_topic: /manriix/cluster_tracks_fused
+    output_markers_topic: /manriix/fusion_markers
+    gamma: 1.5
+    freq_window: 2.0
+    assoc_gate_xy: 0.7
+    person_label_hold: 1.5
+
+motion_estimation_node:
+  ros__parameters:
+    tracks_topic: /manriix/cluster_tracks_fused
+    output_tracks_topic: /manriix/objects
+    output_markers_topic: /manriix/motion_markers
+    q_pos: 0.05
+    q_vel: 0.5
+    r_meas: 0.02
+    lost_keepalive: 2.0
+    reassoc_mahalanobis: 3.0
+    min_speed_arrow: 0.15
+
+occupancy_grid_node:
+  ros__parameters:
+    tracks_topic: /manriix/objects
+    map_frame: map               # grid persistence frame (cuVSLAM map)
+    base_frame: base_footprint
+    obstacle_cloud_frame: base_footprint   # STVL-safe sensor-relative frame
+
+    grid_size: 8.0
+    resolution: 0.05
+    inflate_cells: 2
+    predict_horizon: 1.0
+    predict_steps: 5
+    static_hit: 30
+    static_decay: 2
+    static_max: 100
+    static_occupied_thresh: 50

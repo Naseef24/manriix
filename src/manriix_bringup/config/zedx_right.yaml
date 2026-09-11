@@ -1,0 +1,37 @@
+# ============================================================================
+# Manriix — ZED X Right Camera (secondary, no IMU output)
+#
+# Mirrors zedx_left.yaml. Provides right-side stereo coverage to cuVSLAM.
+# ============================================================================
+
+/**:
+  ros__parameters:
+    general:
+      grab_resolution: 'SVGA'
+      grab_frame_rate: 15
+      pub_frame_rate: 15.0
+      camera_name: 'zedx_right'
+      camera_model: 'zedx'
+      serial_number: 46311875
+
+    video:
+      publish_left_right: true
+      publish_gray: true
+
+    depth:
+      depth_mode: 'NONE'
+
+    pos_tracking:
+      pos_tracking_enabled: false
+      publish_tf: false
+      publish_map_tf: false
+
+    sensors:
+      sensors_image_sync: false
+      publish_imu_tf: false
+
+    object_detection:
+      od_enabled: false
+
+    body_tracking:
+      bt_enabled: false

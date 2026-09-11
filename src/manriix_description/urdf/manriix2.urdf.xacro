@@ -29,18 +29,51 @@
     <!-- Include RealSense D455 xacro -->
     <xacro:include filename="$(find manriix_description)/urdf/sensors/realsense_d455.urdf.xacro"/>
     <!-- Mount RealSense D455 Camera -->
-    <!-- <xacro:realsense_d455 parent="base_link">
-        <origin xyz="0.2005 0 0.72354" rpy="0 0 0"/>
-    </xacro:realsense_d455> -->
+    <xacro:realsense_d455 parent="base_link">
+        <origin xyz="-0.30 0 -0.285" rpy="0 0 3.14159"/>
+    </xacro:realsense_d455>
     
     <!-- RPLidar A2M12 Sensor -->
     <xacro:include filename="$(find manriix_description)/urdf/sensors/rplidar.urdf.xacro"/>
     <!-- Mount RPLidar using xacro macro -->
     <xacro:rplidar parent="base_link">
         <!-- <origin xyz="0.345 0 -0.17" rpy="0 0 3.14"/> -->
-        <origin xyz="0.345 0 -0.20" rpy="0 0 3.14"/>
+        <origin xyz="0.345 0 -0.20" rpy="0.0 0.0 3.04159"/>
     </xacro:rplidar>
 
+    <!-- OAK-D Pro W — URDF declared here (single source of truth).
+         The depthai driver launch loads ONLY the Camera component (no
+         duplicate robot_state_publisher). Our main bringup's RSP publishes
+         these frames. Frame names match what the driver's data uses
+         (camera_name='oak_d_pro_w' in the driver launch).
+         Naming-tie-in:
+           - In urdf_launch.py the driver expects: tf_prefix == camera_name
+           - The frame the data uses is <camera_name>_rgb_camera_optical_frame
+             (= oak_d_pro_w_rgb_camera_optical_frame)
+           - base_frame here MUST equal the driver's i_tf_base_frame which
+             defaults to <camera_name>; pass the same in launch. -->
+    <xacro:include filename="$(find depthai_descriptions)/urdf/include/depthai_macro.urdf.xacro"/>
+    <xacro:depthai_camera
+        camera_name="oak_d_pro_w"
+        camera_model="OAK-D-PRO-W"
+        parent="base_link"
+        base_frame="oak_d_pro_w"
+        cam_pos_x="0.40"
+        cam_pos_y="-0.0375"
+        cam_pos_z="-0.27"
+        cam_roll="0.0"
+        cam_pitch="-0.08"
+        cam_yaw="0.0"
+        rs_compat="false"/>
+        
+    <!-- DJI RS3 Pro Gimbal -->
+    <xacro:include filename="$(find manriix_description)/urdf/sensors/dji_rs3pro.urdf.xacro"/>
+    <!-- Mount gimbal at robot centre, 0.74m above base_link, facing forward -->
+    <!-- <xacro:dji_rs3pro parent="base_link">
+        <origin xyz="0.0 0.0 0.82103" rpy="0 0 0"/>
+    </xacro:dji_rs3pro> -->
+    <xacro:dji_rs3pro parent="base_link"/>
+    
     <!-- ZED X Cameras -->
     <xacro:include filename="$(find manriix_description)/urdf/sensors/zedx_camera.urdf.xacro"/>
     <!-- ZED X Front Camera -->
