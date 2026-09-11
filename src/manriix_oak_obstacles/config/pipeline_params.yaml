@@ -287,11 +287,11 @@ pointcloud_filter_node:
     input_topic: /oak/points
     output_dense_topic: /manriix/points_dense
     output_filtered_topic: /manriix/points_filtered
-    target_frame: base_footprint
+    target_frame: odom #base_footprint
 
     l_d: 5.0 #5.0     # depth trust limit [m]
-    l_g: 0.03     # ground crop height [m], near-field base margin
-    l_h: 1.0     # ceiling crop height [m]
+    l_g: 0.05 #0.1 #0.0     # ground crop height [m], near-field base margin
+    l_h: 1.0 #0.5 #1.0     # ceiling crop height [m]
     l_l: 0.05    # voxel leaf size [m]
     l_n: 30      # min neighbors (radius outlier filter)
     l_r: 0.5     # radius [m] (radius outlier filter)
@@ -303,6 +303,7 @@ pointcloud_filter_node:
     baseline_m: 0.075
     disparity_sigma_px: 0.5
     ground_margin_k: 3.0
+    max_stale_transform_age: 0.5   # seconds
 
 cluster_tracking_node:
   ros__parameters:
@@ -310,9 +311,9 @@ cluster_tracking_node:
     output_tracks_topic: /manriix/cluster_tracks
     output_markers_topic: /manriix/cluster_markers
 
-    dbscan_eps: 0.3            # [m] neighborhood radius
-    dbscan_min_samples: 15     # min points to form a dense region
-    min_cluster_points: 15     # discard clusters smaller than this
+    dbscan_eps: 0.2 #0.3            # [m] neighborhood radius
+    dbscan_min_samples: 25 #15     # min points to form a dense region
+    min_cluster_points: 60 #15     # discard clusters smaller than this
 
     track_max_assoc_dist: 0.6  # [m] GNN association gate
     track_timeout: 1.0         # [s] keep unmatched (occluded) tracks alive this long
@@ -324,7 +325,7 @@ static_dynamic_classifier_node:
     tracks_topic: /manriix/cluster_tracks
     camera_info_topic: /oak/stereo/camera_info #/oak/right/camera_info
     camera_frame: oak_rgb_camera_optical_frame #oak_d_pro_w_rgb_camera_optical_frame #oak_right_camera_optical_frame
-    map_frame: base_footprint
+    map_frame: odom #base_footprint
 
     output_tracks_topic: /manriix/cluster_tracks_classified
     output_markers_topic: /manriix/classification_markers
@@ -340,18 +341,44 @@ static_dynamic_classifier_node:
     buffer_horizon: 1.5            # [s] history retained for lookback
     max_proj_points: 6000          # dense-cloud subsample for occlusion depth map
 
+# people_tracker_node:
+#   ros__parameters:
+#     detections_topic: /oak/nn/spatial_detections
+#     output_topic: /manriix/person_boxes
+#     target_frame: base_footprint
+#     confidence_threshold: 0.5
+#     max_assoc_dist: 0.7        # [m] 3D association gate
+#     box_timeout: 0.7
+#     min_hits_to_confirm: 2
+#     publish_debug_image: true
+#     image_topic: /oak/nn/passthrough/image_raw
+#     debug_image_topic: /manriix/detection_image
+
+# fusion_node:
+#   ros__parameters:
+#     tracks_topic: /manriix/cluster_tracks_classified
+#     person_boxes_topic: /manriix/person_boxes
+#     output_tracks_topic: /manriix/cluster_tracks_fused
+#     output_markers_topic: /manriix/fusion_markers
+
+#     gamma: 1.5             # [1/s] association frequency threshold (paper Sec IV-A)
+#     freq_window: 2.0        # [s] window for measuring f_a
+#     assoc_gate_xy: 0.7      # [m] person<->cluster association gate (x-y plane)
+#     person_label_hold: 1.5  # [s] keep 'person' after last association
+
 people_tracker_node:
   ros__parameters:
     detections_topic: /oak/nn/spatial_detections
     output_topic: /manriix/person_boxes
-    target_frame: base_footprint
     confidence_threshold: 0.5
-    max_assoc_dist: 0.7        # [m] 3D association gate
+    iou_threshold: 0.3            # NEW — replaces max_assoc_dist
     box_timeout: 0.7
     min_hits_to_confirm: 2
     publish_debug_image: true
     image_topic: /oak/nn/passthrough/image_raw
     debug_image_topic: /manriix/detection_image
+    # REMOVED: target_frame, max_assoc_dist, spatial_sign_x/y/z, max_person_range
+    #   — no longer used, this node has no 3D position or TF dependency at all now
 
 fusion_node:
   ros__parameters:
@@ -359,12 +386,15 @@ fusion_node:
     person_boxes_topic: /manriix/person_boxes
     output_tracks_topic: /manriix/cluster_tracks_fused
     output_markers_topic: /manriix/fusion_markers
-
-    gamma: 1.5             # [1/s] association frequency threshold (paper Sec IV-A)
-    freq_window: 2.0        # [s] window for measuring f_a
-    assoc_gate_xy: 0.7      # [m] person<->cluster association gate (x-y plane)
-    person_label_hold: 1.5  # [s] keep 'person' after last association
-
+    preview_camera_info_topic: /oak/rgb/preview/camera_info   # NEW
+    gamma: 1.5
+    freq_window: 2.0
+    person_label_hold: 1.5
+    min_points_in_box: 5           # NEW — replaces assoc_gate_xy
+    max_proj_points_per_cluster: 400   # NEW
+    # REMOVED: assoc_gate_xy — replaced by pixel-projection containment
+    person_position_percentile: 10.0   # NEW
+    
 motion_estimation_node:
   ros__parameters:
     tracks_topic: /manriix/cluster_tracks_fused
@@ -382,7 +412,7 @@ motion_estimation_node:
 occupancy_grid_node:
   ros__parameters:
     tracks_topic: /manriix/objects
-    map_frame: map
+    map_frame: odom #map
     base_frame: base_footprint
 
     grid_size: 8.0          # [m]

@@ -37,6 +37,7 @@ setup(
             'motion_estimation_node = manriix_oak_obstacles.motion_estimation_node:main',
             'occupancy_grid_node = manriix_oak_obstacles.occupancy_grid_node:main',
             'detection_overlay_node = manriix_oak_obstacles.detection_overlay_node:main',
+            'fov_marker_node = manriix_oak_obstacles.fov_marker_node:main',
         ],
     },
 )

@@ -5,7 +5,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import ComposableNodeContainer, LoadComposableNodes
+from launch_ros.actions import ComposableNodeContainer, LoadComposableNodes, Node
 from launch_ros.descriptions import ComposableNode
 
 
@@ -59,5 +59,26 @@ def generate_launch_description():
                     ],
                 ),
             ],
+        ),
+        
+        Node(
+            package='manriix_oak_obstacles',
+            executable='fov_marker_node',
+            name='fov_marker_node',
+            output='screen',
+            parameters=[{
+                'base_frame': 'base_footprint',
+                # DEV launch (oak_camera.launch.py): camera_name='oak'
+                #   -> camera_frame: 'oak_rgb_camera_optical_frame'
+                # PROD launch (oak_camera_prod.launch.py): match whatever
+                #   camera_name is actually deployed there, e.g.
+                #   'oak_d_pro_w_rgb_camera_optical_frame' if that naming
+                #   is used, or 'oak_rgb_camera_optical_frame' if the
+                #   dev-style naming was kept (as it currently is on Kyro).
+                'camera_frame': 'oak_rgb_camera_optical_frame',
+                'horizontal_fov_deg': 127.0,
+                'range_m': 3.0,   # keep in sync with pointcloud_filter_node's l_d
+                'publish_rate_hz': 5.0,
+            }],
         ),
     ])
