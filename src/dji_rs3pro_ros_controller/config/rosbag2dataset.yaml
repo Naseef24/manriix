@@ -1,9 +1,0 @@
-/**:
-  ros__parameters:
-    save_data_directory: "/tmp/gimbal_dataset"
-    csv_name: "dataset.csv"
-    gimbal_eular_angle_topic_name: "/gimbal_angle"
-    imu_eular_angle_topic_name: "/imu_correct_angle"
-    decompressed_image_topic_name: "/camera/image_raw"
-    imu_data_topic_name: "/imu/data"
-    ros_rate: 10

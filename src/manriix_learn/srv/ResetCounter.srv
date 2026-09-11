@@ -1,6 +1,0 @@
-# Request
-int32 reset_value
----
-# Response
-bool success
-string message

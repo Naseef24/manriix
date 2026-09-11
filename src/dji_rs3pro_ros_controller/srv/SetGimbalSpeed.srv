@@ -1,6 +1,0 @@
-int16 yaw_speed
-int16 roll_speed
-int16 pitch_speed
----
-bool success
-string message

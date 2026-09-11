@@ -1,7 +1,0 @@
-# Request
-bool enable
-uint8 calibration_type
----
-# Response
-bool success
-string message

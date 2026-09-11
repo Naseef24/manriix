@@ -1,9 +1,0 @@
-<library path="manriix_4ws_controller">
-  <class name="manriix_controller/Manriix4WSController"
-         type="manriix_controller::Manriix4WSController"
-         base_class_type="controller_interface::ControllerInterface">
-    <description>
-      Manriix 4-Wheel Steering Controller for robots with independent steering on all four wheels.
-    </description>
-  </class>
-</library>

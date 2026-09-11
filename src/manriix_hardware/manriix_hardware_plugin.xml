@@ -1,9 +1,0 @@
-<library path="manriix_hardware">
-  <class name="manriix_hardware/ManriixSystem"
-         type="manriix_hardware::ManriixSystem"
-         base_class_type="hardware_interface::SystemInterface">
-    <description>
-      Hardware interface for Manriix 4WS robot with CubeMars steering actuators and Zltech hub motors
-    </description>
-  </class>
-</library>

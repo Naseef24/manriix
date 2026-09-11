@@ -1,6 +1,0 @@
-# Request
-int16 position
----
-# Response
-bool success
-string message
