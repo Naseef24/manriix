@@ -33,10 +33,22 @@ RIGHT  S/N 46311875
 Important reliability behaviour
 -------------------------------
 1. All 3 sl.Camera instances are opened sequentially BEFORE capture threads start.
-2. If any camera cannot open, already-open cameras are closed and the node exits.
-3. No runtime camera reopen/retry loop.
-4. On shutdown, capture threads stop first, then cameras close RIGHT -> LEFT -> FRONT.
-5. Side cameras never enable depth, tracking, IMU processing, point clouds or ZED OD.
+2. Each camera gets a few open attempts (fresh sl.Camera() object each retry,
+   short delay between) before being considered failed -- covers transient
+   GMSL2/cold-start hiccups (e.g. "corrupted frames" on the first attempt)
+   without needing a full node restart. See CAMERA_OPEN_MAX_ATTEMPTS below.
+3. If the whole open sequence still fails after per-camera retries (e.g.
+   the daemon process itself has degraded, not just one open() call),
+   zed_x_daemon.service is restarted and the full sequence is retried
+   from scratch, up to DAEMON_RECOVERY_MAX_CYCLES times.
+4. If it still cannot get all 3 cameras after that, already-open cameras
+   are closed and the node exits -- still all-or-nothing, on purpose:
+   this process must end up owning all 3 cameras or none, never a
+   degraded subset, since every camera is required for the full
+   system's tasks. (The launch file's respawn=True is the last resort
+   from here.)
+5. On shutdown, capture threads stop first, then cameras close RIGHT -> LEFT -> FRONT.
+6. Side cameras never enable depth, tracking, IMU processing, point clouds or ZED OD.
 
 Front ROS topics intentionally match the existing MANRIIX/cuVSLAM naming:
   /zedx_front/zed_node/left/gray/rect/image
@@ -58,6 +70,7 @@ Monitoring:
 from __future__ import annotations
 
 import math
+import subprocess
 import threading
 import time
 from typing import Dict, Optional
@@ -81,6 +94,21 @@ from sensor_msgs.msg import CameraInfo, Image, Imu
 FRONT_SERIAL = 41911351
 LEFT_SERIAL = 40487925
 RIGHT_SERIAL = 46311875
+
+# Per-camera open retry (see "Important reliability behaviour" above).
+CAMERA_OPEN_MAX_ATTEMPTS = 4
+CAMERA_OPEN_RETRY_DELAY_SEC = 2.0
+
+# Escalation tier: if per-camera retries above still aren't enough (e.g.
+# the daemon itself, not just one open() call, has degraded), restart
+# zed_x_daemon.service and retry the whole _open_all_cameras() sequence.
+# Requires passwordless sudo for exactly `systemctl restart
+# zed_x_daemon.service` (see /etc/sudoers.d/manriix-zed) -- if that isn't
+# configured, the restart attempt just logs a warning and is skipped,
+# falling back to retry-only behaviour.
+DAEMON_RECOVERY_MAX_CYCLES = 2
+DAEMON_RESTART_SETTLE_SEC = 5.0
+ZED_DAEMON_SERVICE_NAME = "zed_x_daemon.service"
 
 
 class MultiZedCaptureNode(Node):
@@ -230,7 +258,7 @@ class MultiZedCaptureNode(Node):
         # Open ALL cameras before starting ANY grab thread
         # ------------------------------------------------------------
         try:
-            self._open_all_cameras()
+            self._open_all_cameras_with_recovery()
             self._build_front_camera_info()
             self._build_side_camera_info("left")
             self._build_side_camera_info("right")
@@ -306,24 +334,47 @@ class MultiZedCaptureNode(Node):
             f"depth={'%s' % self.front_depth_mode_name if front else 'NONE'}"
         )
 
-        status = self.cameras[name].open(
-            self._make_init_params(serial, front)
-        )
-
-        if status != sl.ERROR_CODE.SUCCESS:
-            raise RuntimeError(
-                f"{name.upper()} ZED open failed "
-                f"(serial={serial}): {status}"
+        last_status = None
+        for attempt in range(1, CAMERA_OPEN_MAX_ATTEMPTS + 1):
+            status = self.cameras[name].open(
+                self._make_init_params(serial, front)
             )
 
-        actual_serial = (
-            self.cameras[name]
-            .get_camera_information()
-            .serial_number
-        )
+            if status == sl.ERROR_CODE.SUCCESS:
+                actual_serial = (
+                    self.cameras[name]
+                    .get_camera_information()
+                    .serial_number
+                )
+                self.get_logger().info(
+                    f"[OPEN OK] {name.upper()} serial={actual_serial}"
+                    + (f" (attempt {attempt}/{CAMERA_OPEN_MAX_ATTEMPTS})"
+                       if attempt > 1 else "")
+                )
+                return
 
-        self.get_logger().info(
-            f"[OPEN OK] {name.upper()} serial={actual_serial}"
+            last_status = status
+            self.get_logger().warning(
+                f"[OPEN FAIL] {name.upper()} serial={serial} "
+                f"attempt {attempt}/{CAMERA_OPEN_MAX_ATTEMPTS}: {status}"
+            )
+
+            if attempt < CAMERA_OPEN_MAX_ATTEMPTS:
+                # A failed open() can leave the sl.Camera in a state that
+                # won't cleanly retry in place (common after GMSL2
+                # cold-start hiccups like transient "corrupted frames") --
+                # discard it and retry with a fresh instance.
+                try:
+                    self.cameras[name].close()
+                except Exception:
+                    pass
+                self.cameras[name] = sl.Camera()
+                time.sleep(CAMERA_OPEN_RETRY_DELAY_SEC)
+
+        raise RuntimeError(
+            f"{name.upper()} ZED open failed "
+            f"(serial={serial}) after {CAMERA_OPEN_MAX_ATTEMPTS} attempts: "
+            f"{last_status}"
         )
 
     def _open_all_cameras(self):
@@ -349,6 +400,70 @@ class MultiZedCaptureNode(Node):
         self.get_logger().info(
             "[OPEN+VERIFY] ALL THREE ZED X CAMERAS OPEN"
         )
+
+    def _restart_zed_daemon(self) -> bool:
+        """Best-effort restart of zed_x_daemon.service. Returns True if the
+        restart command itself succeeded; False (with a logged warning) if
+        it couldn't run (e.g. passwordless sudo not yet configured) --
+        callers should still fall through to a plain retry in that case,
+        not treat it as fatal on its own."""
+        try:
+            result = subprocess.run(
+                ["sudo", "-n", "systemctl", "restart", ZED_DAEMON_SERVICE_NAME],
+                timeout=15,
+                capture_output=True,
+                text=True,
+            )
+        except Exception as exc:
+            self.get_logger().warning(
+                f"Could not run zed_x_daemon restart command: {exc}"
+            )
+            return False
+
+        if result.returncode != 0:
+            self.get_logger().warning(
+                f"zed_x_daemon restart failed (rc={result.returncode}): "
+                f"{result.stderr.strip() or result.stdout.strip()} -- "
+                f"passwordless sudo may not be configured for "
+                f"'systemctl restart {ZED_DAEMON_SERVICE_NAME}'"
+            )
+            return False
+
+        self.get_logger().info(f"Restarted {ZED_DAEMON_SERVICE_NAME}.")
+        return True
+
+    def _open_all_cameras_with_recovery(self):
+        """_open_all_cameras() already retries each camera's open()
+        individually. If the whole sequence still fails -- e.g. the
+        daemon process itself (not just one open() call) has degraded --
+        restart zed_x_daemon.service and retry the full sequence from
+        scratch, up to DAEMON_RECOVERY_MAX_CYCLES times, before finally
+        raising (still all-or-nothing: never proceeds with a partial set
+        of cameras)."""
+        for cycle in range(DAEMON_RECOVERY_MAX_CYCLES + 1):
+            try:
+                self._open_all_cameras()
+                return
+            except Exception as exc:
+                if cycle >= DAEMON_RECOVERY_MAX_CYCLES:
+                    raise
+
+                self.get_logger().warning(
+                    f"All-camera open failed even after per-camera "
+                    f"retries (recovery cycle {cycle + 1}/"
+                    f"{DAEMON_RECOVERY_MAX_CYCLES}): {exc}. "
+                    f"Restarting {ZED_DAEMON_SERVICE_NAME} and retrying."
+                )
+                self._close_all_cameras()
+                self._restart_zed_daemon()
+                time.sleep(DAEMON_RESTART_SETTLE_SEC)
+                # Fresh sl.Camera() objects for the next full attempt --
+                # same reasoning as the per-camera retry in _open_camera().
+                self.cameras = {
+                    "front": sl.Camera(),
+                    "left": sl.Camera(),
+                    "right": sl.Camera(),
+                }
 
     # ================================================================
     # CameraInfo generation

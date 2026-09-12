@@ -396,6 +396,14 @@ def generate_launch_description():
         output="screen",
         emulate_tty=True,
 
+        # Last-resort safety net: the node itself already retries each
+        # camera's open() a few times (see multi_zed_capture_node.py), but
+        # if it still exits (e.g. a camera never recovers), keep trying
+        # rather than leaving the whole perception stack permanently dead
+        # until someone notices and relaunches manually.
+        respawn=True,
+        respawn_delay=5.0,
+
         parameters=[
             {
                 "use_sim_time": use_sim_time,
