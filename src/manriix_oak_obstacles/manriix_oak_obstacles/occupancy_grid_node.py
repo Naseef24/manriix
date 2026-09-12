@@ -8,9 +8,20 @@ Implements Section III-H (2D Occupancy grid) of:
 
 Three maps are maintained in parallel, as in the paper:
   STATIC    -- persistent costs from clusters classified 'static'.
-               The paper clears erroneously-occupied space by
-               raytracing; we approximate that with observation decay:
-               static cells not re-observed lose confidence and release.
+               Cleared by RAYTRACING, as the paper specifies ("use
+               raytracing to clear free space once it was erroneously
+               occupied"): every frame, a subsample of the dense,
+               unfiltered cloud h^d (/manriix/points_dense -- the same
+               stream pointcloud_filter_node keeps around for occlusion
+               reasoning) is transformed into the map frame, and the
+               straight line from the robot to each observed point is
+               walked cell-by-cell, hard-clearing static confidence
+               along the way (the sensor's line of sight to that point
+               necessarily passed through empty space there). A slow
+               observation-decay is kept ADDITIONALLY as a fallback for
+               cells outside the current raytrace sample/FOV, so old
+               static marks still eventually release even if nothing
+               happens to precisely re-trace through them.
   DYNAMIC   -- rebuilt every frame from 'dynamic'/'person' objects.
                Costs are EXPANDED IN THE DIRECTION OF THE ESTIMATED
                VELOCITY (the object's footprint is swept along v*t for
@@ -88,9 +99,14 @@ class OccupancyGridNode(Node):
         self.declare_parameter('predict_horizon', 1.0)   # [s] velocity sweep length
         self.declare_parameter('predict_steps', 5)        # sweep sub-steps
         self.declare_parameter('static_hit', 30)          # confidence added per observation
-        self.declare_parameter('static_decay', 2)         # confidence lost per frame
+        self.declare_parameter('static_decay', 2)         # confidence lost per frame (fallback release)
         self.declare_parameter('static_max', 100)
         self.declare_parameter('static_occupied_thresh', 50)
+
+        # ---- Sec III-H raytrace clearing ----
+        self.declare_parameter('enable_raytrace_clearing', True)
+        self.declare_parameter('dense_topic', '/manriix/points_dense')
+        self.declare_parameter('raytrace_max_points', 200)  # perf cap per frame
 
         self.tracks_topic = self.get_parameter('tracks_topic').value
         self.map_frame = self.get_parameter('map_frame').value
@@ -105,6 +121,12 @@ class OccupancyGridNode(Node):
         self.static_decay = int(self.get_parameter('static_decay').value)
         self.static_max = int(self.get_parameter('static_max').value)
         self.static_occupied_thresh = int(self.get_parameter('static_occupied_thresh').value)
+
+        self.enable_raytrace_clearing = bool(self.get_parameter('enable_raytrace_clearing').value)
+        self.dense_topic = self.get_parameter('dense_topic').value
+        self.raytrace_max_points = int(self.get_parameter('raytrace_max_points').value)
+        self._latest_dense_pts = None
+        self._latest_dense_frame = None
 
         self.n_cells = int(round(self.grid_size / self.resolution))
 
@@ -123,6 +145,9 @@ class OccupancyGridNode(Node):
         )
         self.create_subscription(
             ClusterTrackArray, self.tracks_topic, self._cb, qos)
+        if self.enable_raytrace_clearing:
+            self.create_subscription(
+                PointCloud2, self.dense_topic, self._dense_cb, qos)
 
         self.pub_static = self.create_publisher(OccupancyGrid, '/manriix/grid/static', 5)
         self.pub_dynamic = self.create_publisher(OccupancyGrid, '/manriix/grid/dynamic', 5)
@@ -219,6 +244,50 @@ class OccupancyGridNode(Node):
         return R, np.array([t.x, t.y, t.z])
 
     # ------------------------------------------------------------------
+    def _dense_cb(self, msg: PointCloud2):
+        """Cache the latest dense (unfiltered) cloud h^d for raytrace
+        clearing. Same stream pointcloud_filter_node already publishes
+        for occlusion reasoning (Sec III-D.2) -- reused here instead of
+        adding a second dedicated topic."""
+        pts = pc2.read_points_numpy(
+            msg, field_names=('x', 'y', 'z'), skip_nans=True)
+        if pts.shape[0] == 0:
+            return
+        self._latest_dense_pts = pts.astype(np.float64)
+        self._latest_dense_frame = msg.header.frame_id
+
+    # ------------------------------------------------------------------
+    def _raytrace_clear(self, origin_xy, points_xy):
+        """Sec III-H: 'use raytracing to clear free space once it was
+        erroneously occupied.' For each observed point, the straight
+        line from the robot to that point necessarily passed through
+        empty space -- hard-clear static confidence along that line
+        (excluding the point's own cell, which `static_observed`/hits
+        judge separately this same callback)."""
+        n = points_xy.shape[0]
+        if n == 0:
+            return
+        if n > self.raytrace_max_points:
+            sel = np.random.choice(n, self.raytrace_max_points, replace=False)
+            points_xy = points_xy[sel]
+
+        origin_cell = (origin_xy - self.origin_xy) / self.resolution
+        pts_cell = (points_xy - self.origin_xy) / self.resolution
+        ox, oy = origin_cell
+
+        for px, py in pts_cell:
+            steps = int(max(abs(px - ox), abs(py - oy)))
+            if steps <= 1:
+                continue  # point is adjacent to the robot -- nothing to trace through
+            # Walk the line, EXCLUDING the origin cell (index 0) and the
+            # endpoint (endpoint=False already drops it).
+            xs = np.linspace(ox, px, steps, endpoint=False)[1:]
+            ys = np.linspace(oy, py, steps, endpoint=False)[1:]
+            xi, yi = xs.astype(int), ys.astype(int)
+            ok = (xi >= 0) & (xi < self.n_cells) & (yi >= 0) & (yi < self.n_cells)
+            self.static_conf[yi[ok], xi[ok]] = 0
+
+    # ------------------------------------------------------------------
     def _cb(self, msg: ClusterTrackArray):
         robot_xy = self._robot_xy()
         center = robot_xy - self.grid_size / 2.0
@@ -271,7 +340,16 @@ class OccupancyGridNode(Node):
                 idx = self._world_to_cell(xy)
                 self._mark(uncertain_grid, idx, 80)
 
-        # ---- static layer update: hits + decay (raytrace substitute) ----
+        # ---- Sec III-H: raytrace clearing (runs BEFORE hits, so a cell
+        # observed as free this frame doesn't get re-marked static by a
+        # stale hit from earlier in the same frame's own track list) ----
+        if (self.enable_raytrace_clearing and self._latest_dense_pts is not None
+                and self._latest_dense_frame == msg.header.frame_id):
+            dense_map_xy = (self._latest_dense_pts @ R.T + t)[:, :2]
+            self._raytrace_clear(robot_xy, dense_map_xy)
+
+        # ---- static layer update: hits + slow decay (fallback release
+        # for cells outside this frame's raytrace sample/FOV) ----
         self.static_conf = np.maximum(self.static_conf - self.static_decay, 0)
         self.static_conf[static_observed] = np.minimum(
             self.static_conf[static_observed] + self.static_hit + self.static_decay,

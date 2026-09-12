@@ -8,8 +8,25 @@ Implements Section III-C (Clustering and 3D Tracking) of:
 
 1) Clustering (Sec III-C.1):
    DBSCAN on the filtered cloud h^s (/manriix/points_filtered) -> a set
-   of clusters. (Bounding-box refinement using the 2D people detector is
-   added in Step 5 / Section III-F; skipped here.)
+   of clusters, THEN refined against the 2D people-detector boxes
+   (/manriix/person_boxes), exactly as the paper specifies for this
+   step (not deferred to fusion -- Sec III-F's fusion is a SEPARATE,
+   later step that only handles the pedestrian-classification vote):
+     "separate any clusters which are associated with more than one
+     bounding-box" and "separate clusters whose fraction of points
+     laying within the bounding-box is below a threshold."
+   Implemented in _refine_with_boxes(): each cluster's points are
+   projected into the detector's camera image (same intrinsics/frame
+   fusion_node uses); a cluster overlapping >1 box is split one
+   sub-cluster per box (+ a leftover remainder); a cluster overlapping
+   exactly 1 box whose in-box point fraction is below
+   `box_split_min_fraction` is split into its in-box/out-of-box parts
+   instead of being left as one ambiguous blob. This runs BEFORE
+   tracking so DBSCAN merges (e.g. two people standing close together,
+   or a person merged with adjacent furniture) get separated prior to
+   ID assignment, not after. Falls back to unrefined clusters cleanly
+   if camera intrinsics/TF/boxes aren't available yet or
+   `enable_box_refinement` is False -- never blocks the base pipeline.
 
 2) 3D tracking (Sec III-C.2):
    At each frame t, compute centroids c_t of all current clusters C_t.
@@ -41,12 +58,31 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPo
 from rclpy.time import Time
 from rclpy.duration import Duration
 
-from sensor_msgs.msg import PointCloud2
+import tf2_ros
+from tf2_ros import TransformException
+
+from sensor_msgs.msg import PointCloud2, CameraInfo
 from sensor_msgs_py import point_cloud2 as pc2
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Point, Vector3
 
-from manriix_oak_obstacles_msgs.msg import ClusterTrack, ClusterTrackArray
+from manriix_oak_obstacles_msgs.msg import (
+    ClusterTrack, ClusterTrackArray, BoundingBoxTrackArray)
+
+
+def quat_to_rot_matrix(x, y, z, w):
+    n = x * x + y * y + z * z + w * w
+    if n < 1e-12:
+        return np.eye(3)
+    s = 2.0 / n
+    xx, yy, zz = x * x * s, y * y * s, z * z * s
+    xy, xz, yz = x * y * s, x * z * s, y * z * s
+    wx, wy, wz = w * x * s, w * y * s, w * z * s
+    return np.array([
+        [1.0 - (yy + zz), xy - wz, xz + wy],
+        [xy + wz, 1.0 - (xx + zz), yz - wx],
+        [xz - wy, yz + wx, 1.0 - (xx + yy)],
+    ])
 
 
 class Track:
@@ -93,6 +129,17 @@ class ClusterTrackingNode(Node):
         self.declare_parameter('track_timeout', 1.0)          # [s] before dropping a lost track
         self.declare_parameter('min_hits_to_confirm', 3)      # consecutive matched frames before publishing/drawing
 
+        # ---- Sec III-C.1 box-based cluster refinement ----
+        self.declare_parameter('enable_box_refinement', True)
+        self.declare_parameter('person_boxes_topic', '/manriix/person_boxes')
+        # Same preview-stream intrinsics fusion_node's v2 association uses
+        # (the detector's own input resolution, NOT the stereo depth
+        # camera's native intrinsics -- these can differ significantly).
+        self.declare_parameter('preview_camera_info_topic', '/oak/rgb/preview/camera_info')
+        self.declare_parameter('box_min_points_in_box', 5)     # min projected points to count as overlap
+        self.declare_parameter('box_split_min_fraction', 0.5)  # paper's "fraction...below a threshold"
+        self.declare_parameter('box_max_proj_points', 800)     # perf cap per cluster
+
         self.input_topic = self.get_parameter('input_topic').value
         self.output_tracks_topic = self.get_parameter('output_tracks_topic').value
         self.output_markers_topic = self.get_parameter('output_markers_topic').value
@@ -105,9 +152,15 @@ class ClusterTrackingNode(Node):
         self.track_timeout = float(self.get_parameter('track_timeout').value)
         self.min_hits_to_confirm = int(self.get_parameter('min_hits_to_confirm').value)
 
+        self.enable_box_refinement = bool(self.get_parameter('enable_box_refinement').value)
+        self.box_min_points_in_box = int(self.get_parameter('box_min_points_in_box').value)
+        self.box_split_min_fraction = float(self.get_parameter('box_split_min_fraction').value)
+        self.box_max_proj_points = int(self.get_parameter('box_max_proj_points').value)
+
         self.get_logger().info(
             f'DBSCAN eps={self.dbscan_eps} min_samples={self.dbscan_min_samples} | '
-            f'assoc_gate={self.track_max_assoc_dist}m timeout={self.track_timeout}s'
+            f'assoc_gate={self.track_max_assoc_dist}m timeout={self.track_timeout}s | '
+            f'box_refinement={self.enable_box_refinement}'
         )
 
         qos = QoSProfile(
@@ -127,6 +180,31 @@ class ClusterTrackingNode(Node):
         self.tracks = {}  # track_id -> Track
         self._prev_marker_count = 0
 
+        # ---- Sec III-C.1 box refinement state ----
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
+        self.K = None
+        self.latest_boxes_msg = None
+        if self.enable_box_refinement:
+            self.create_subscription(
+                CameraInfo, self.get_parameter('preview_camera_info_topic').value,
+                self._camera_info_cb, 5)
+            self.create_subscription(
+                BoundingBoxTrackArray,
+                self.get_parameter('person_boxes_topic').value,
+                self._boxes_cb, 10)
+
+    # ------------------------------------------------------------------
+    def _camera_info_cb(self, msg: CameraInfo):
+        if self.K is None:
+            self.K = np.array(msg.k, dtype=np.float64).reshape(3, 3)
+            self.get_logger().info(
+                f'Box-refinement camera intrinsics received '
+                f'({msg.width}x{msg.height}):\n{self.K}')
+
+    def _boxes_cb(self, msg: BoundingBoxTrackArray):
+        self.latest_boxes_msg = msg
+
     # ------------------------------------------------------------------
     def cloud_callback(self, msg: PointCloud2):
         now = Time.from_msg(msg.header.stamp).nanoseconds * 1e-9
@@ -135,10 +213,127 @@ class ClusterTrackingNode(Node):
             msg, field_names=('x', 'y', 'z'), skip_nans=True).astype(np.float64)
 
         clusters = self._cluster(pts)
+        if self.enable_box_refinement:
+            clusters = self._refine_with_boxes(clusters, msg.header.frame_id, now)
         self._associate_and_update(clusters, now)
         self._prune_lost_tracks(now)
 
         self._publish(msg.header, now)
+
+    # ------------------------------------------------------------------
+    def _refine_with_boxes(self, clusters, world_frame, now):
+        """Sec III-C.1: split clusters using the 2D people-detector boxes.
+        Returns `clusters` unchanged if intrinsics/boxes/TF aren't ready
+        yet -- this must never block the base pipeline."""
+        boxes_msg = self.latest_boxes_msg
+        if (self.K is None or boxes_msg is None or not boxes_msg.boxes
+                or (now - Time.from_msg(boxes_msg.header.stamp).nanoseconds * 1e-9) > 0.5):
+            return clusters
+
+        camera_frame = boxes_msg.header.frame_id
+        try:
+            tf = self.tf_buffer.lookup_transform(
+                camera_frame, world_frame, rclpy.time.Time())
+        except TransformException as ex:
+            self.get_logger().warn(
+                f'box refinement: TF {world_frame}->{camera_frame} unavailable: {ex}',
+                throttle_duration_sec=2.0)
+            return clusters
+
+        q = tf.transform.rotation
+        t = tf.transform.translation
+        R = quat_to_rot_matrix(q.x, q.y, q.z, q.w)
+        t = np.array([t.x, t.y, t.z])
+        boxes = boxes_msg.boxes
+
+        refined = []
+        for centroid, pts in clusters:
+            proj_pts = pts
+            if pts.shape[0] > self.box_max_proj_points:
+                sel = np.random.choice(pts.shape[0], self.box_max_proj_points, replace=False)
+                proj_pts = pts[sel]
+
+            pts_cam = proj_pts @ R.T + t
+            depth = pts_cam[:, 2]
+            valid = depth > 1e-3
+            if not np.any(valid):
+                refined.append((centroid, pts))
+                continue
+            pix = np.full((proj_pts.shape[0], 2), np.nan)
+            proj = (self.K @ pts_cam[valid].T).T
+            pix[valid] = proj[:, :2] / proj[:, 2:3]
+
+            # Which box (if any) each *projected* point falls inside.
+            # -1 = none. Built on the (possibly subsampled) proj_pts, then
+            # applied back onto the FULL cluster below via a second pass
+            # (projection is cheap; re-running it on the full set only
+            # when we actually need to split keeps the common no-split
+            # case fast).
+            box_id_per_point = np.full(proj_pts.shape[0], -1, dtype=int)
+            counts = np.zeros(len(boxes), dtype=int)
+            for bi, b in enumerate(boxes):
+                inside = (
+                    valid &
+                    (pix[:, 0] >= b.xmin) & (pix[:, 0] <= b.xmax) &
+                    (pix[:, 1] >= b.ymin) & (pix[:, 1] <= b.ymax)
+                )
+                counts[bi] = int(inside.sum())
+                if counts[bi] >= self.box_min_points_in_box:
+                    box_id_per_point[inside] = bi
+
+            matched = sorted({b for b in box_id_per_point.tolist() if b >= 0})
+
+            if not matched:
+                refined.append((centroid, pts))
+                continue
+
+            # Re-project the FULL cluster (not just the subsample) once we
+            # know we need to actually assign/split its points.
+            pts_cam_full = pts @ R.T + t
+            depth_full = pts_cam_full[:, 2]
+            valid_full = depth_full > 1e-3
+            pix_full = np.full((pts.shape[0], 2), np.nan)
+            if np.any(valid_full):
+                proj_full = (self.K @ pts_cam_full[valid_full].T).T
+                pix_full[valid_full] = proj_full[:, :2] / proj_full[:, 2:3]
+            full_box_id = np.full(pts.shape[0], -1, dtype=int)
+            for bi in matched:
+                b = boxes[bi]
+                inside = (
+                    valid_full &
+                    (pix_full[:, 0] >= b.xmin) & (pix_full[:, 0] <= b.xmax) &
+                    (pix_full[:, 1] >= b.ymin) & (pix_full[:, 1] <= b.ymax)
+                )
+                full_box_id[inside] = bi
+
+            if len(matched) == 1:
+                bi = matched[0]
+                in_box = full_box_id == bi
+                frac = float(in_box.mean())
+                if frac >= self.box_split_min_fraction:
+                    # Box explains most of the cluster -- leave it whole.
+                    refined.append((centroid, pts))
+                    continue
+                # Paper's 2nd rule: fraction below threshold -> separate
+                # the in-box part from the rest instead of leaving one
+                # ambiguous blob.
+                for sub_mask in (in_box, ~in_box):
+                    sub_pts = pts[sub_mask]
+                    if sub_pts.shape[0] >= self.min_cluster_points:
+                        refined.append((sub_pts.mean(axis=0), sub_pts))
+                continue
+
+            # >1 box: paper's 1st rule -- split into one sub-cluster per
+            # box, plus whatever's left over (unmatched remainder).
+            for bi in matched:
+                sub_pts = pts[full_box_id == bi]
+                if sub_pts.shape[0] >= self.min_cluster_points:
+                    refined.append((sub_pts.mean(axis=0), sub_pts))
+            leftover = pts[full_box_id == -1]
+            if leftover.shape[0] >= self.min_cluster_points:
+                refined.append((leftover.mean(axis=0), leftover))
+
+        return refined
 
     # ------------------------------------------------------------------
     def _cluster(self, pts: np.ndarray):

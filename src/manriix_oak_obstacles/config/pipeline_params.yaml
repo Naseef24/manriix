@@ -319,6 +319,15 @@ cluster_tracking_node:
     track_timeout: 1.0         # [s] keep unmatched (occluded) tracks alive this long
     min_hits_to_confirm: 3     # consecutive matched frames before a track is published/drawn
 
+    # Sec III-C.1 box-based cluster refinement (NEW — was previously
+    # skipped/deferred; now implemented here, matching the paper)
+    enable_box_refinement: true
+    person_boxes_topic: /manriix/person_boxes
+    preview_camera_info_topic: /oak/rgb/preview/camera_info   # same stream fusion_node/people_tracker_node use
+    box_min_points_in_box: 5
+    box_split_min_fraction: 0.5
+    box_max_proj_points: 800
+
 static_dynamic_classifier_node:
   ros__parameters:
     dense_topic: /manriix/points_dense
@@ -422,6 +431,12 @@ occupancy_grid_node:
     predict_horizon: 1.0     # [s] sweep dynamic costs along velocity
     predict_steps: 5
     static_hit: 30
-    static_decay: 2
+    static_decay: 2          # fallback release rate for cells outside the raytrace sample
     static_max: 100
     static_occupied_thresh: 50
+
+    # Sec III-H raytrace clearing (NEW — replaces decay-only "erroneously
+    # occupied" release with the paper's actual raytracing method)
+    enable_raytrace_clearing: true
+    dense_topic: /manriix/points_dense
+    raytrace_max_points: 200
