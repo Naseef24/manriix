@@ -27,12 +27,21 @@ Workflow:
      nav2_include.launch.py picks it up.
 
 OAK obstacle integration (replaces old RANSAC + DFKI stack):
-  - When enable_oak_obstacles is True, includes oak_obstacle.launch.py
-    from the manriix_oak_obstacles package.
-  - Appends 'oak_stvl_layer' to local_costmap plugins.
-  - The OAK driver and oak_ground_remover_node are NO LONGER LAUNCHED
-    from hardware_abstraction_layer_include / perceptor_include because
-    the new node owns the OAK USB device end-to-end.
+  - enable_oak_obstacles does NOT launch anything itself here -- it only
+    (a) is forwarded to perceptor_include as enable_oak_voxel_costmap,
+    which SSHes into Kyro to start/stop manriix-oak.service (the actual
+    OAK pipeline runs on the Kyro Jetson, not this machine), and
+    (b) controls whether the shared 'obstacle_layer' plugin's
+    'oak_objects' observation source (consuming /manriix/obstacle_cloud)
+    is included below.
+  - 'obstacle_layer' is included in each costmap's plugin list, and its
+    observation_sources rewritten, based on enable_2d_lidar_costmap and
+    enable_oak_obstacles INDEPENDENTLY -- either flag alone is enough to
+    bring the layer in, with only that flag's source(s) wired. (Previously
+    'obstacle_layer' -- and therefore OAK's oak_objects source, since it
+    lived inside the SAME plugin instance -- was only added when
+    enable_2d_lidar_costmap was True; enable_oak_obstacles by itself did
+    nothing to the plugin list at all.)
 
 Remote monitoring note:
   Remote camera/Foxglove traffic is intentionally kept out of this workhorse.
@@ -93,27 +102,22 @@ def build_rewritten_yaml(context, *args, **kwargs):
         global_plugins.append('nvblox_layer')
         print('[NAV INCLUDE] Enabling nvblox layer.')
 
+    # 'obstacle_layer' carries two independent observation sources (per
+    # nav2_params_carter.yaml): 'scan' (LiDAR) and 'oak_objects'
+    # (/manriix/obstacle_cloud, from manriix_oak_obstacles on Kyro).
+    # Bring the layer in -- and wire only the enabled source(s) into its
+    # observation_sources below -- if EITHER flag is set, so OAK obstacles
+    # reach the costmap even with the LiDAR layer disabled, and vice versa.
+    obstacle_sources = []
     if enable_2d_lidar_costmap:
+        obstacle_sources.append('scan')
+        print('[NAV INCLUDE] Enabling 2D LiDAR obstacle source.')
+    if enable_oak_obstacles:
+        obstacle_sources.append('oak_objects')
+        print('[NAV INCLUDE] Enabling OAK obstacle source (obstacle_layer.oak_objects).')
+    if obstacle_sources:
         local_plugins.append('obstacle_layer')
         global_plugins.append('obstacle_layer')
-        print('[NAV INCLUDE] Enabling 2D LiDAR obstacle layer.')
-
-    if enable_oak_obstacles:
-        # OAK obstacle pipeline:
-        #   depthai_ros_driver -> /oak/points
-        #   oak_ground_remover_node (PCL RANSAC + clustering)
-        #     -> /oak/points_obstacles  (marking source)
-        #     -> /oak/points_ground     (clearing source via raytrace)
-        #   nav2_costmap_2d::ObstacleLayer with both sources consumes them
-        #
-        # NOTE: We switched OFF DFKI ground_consistency_layer because its
-        # probabilistic decay couldn't clear cells fast enough at 30 Hz
-        # pipeline rate. Standard ObstacleLayer with mark+clear sources is
-        # the same pattern as the LIDAR scan layer and clears instantly.
-        # local_plugins.append('oak_stvl_layer')
-        # print('[NAV INCLUDE] Enabling OAK ObstacleLayer (mark+clear) — local only.')
-        # local_plugins.append('oak_stvl_layer')
-        print('[NAV INCLUDE] OAK obstacles enabled via obstacle_layer.oak_objects – no STVL layer.')
 
     # Inflation last
     local_plugins.append('inflation_layer')
@@ -145,6 +149,21 @@ def build_rewritten_yaml(context, *args, **kwargs):
         params['global_costmap']['global_costmap']['ros__parameters']['plugins'] = global_plugins
     except KeyError as e:
         print(f'[NAV INCLUDE] WARNING: could not set global_costmap plugins: {e}')
+
+    # -------- Override obstacle_layer.observation_sources (both costmaps) --------
+    # Only wire in the source(s) whose flag is actually enabled -- e.g.
+    # don't leave 'scan' subscribed when enable_2d_lidar_costmap is False,
+    # and don't leave 'oak_objects' subscribed when enable_oak_obstacles
+    # is False (it would just sit there never receiving data, but a costmap
+    # source silently getting no data is a common source of confusion later).
+    if obstacle_sources:
+        for costmap_key in ('local_costmap', 'global_costmap'):
+            try:
+                params[costmap_key][costmap_key]['ros__parameters'] \
+                    ['obstacle_layer']['observation_sources'] = ' '.join(obstacle_sources)
+            except KeyError as e:
+                print(f'[NAV INCLUDE] WARNING: could not set '
+                      f'{costmap_key} obstacle_layer.observation_sources: {e}')
 
     # -------- Override odom_topic for the three nodes that use it --------
     for node_name in ('bt_navigator', 'controller_server', 'velocity_smoother'):
