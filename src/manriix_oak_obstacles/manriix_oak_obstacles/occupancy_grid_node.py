@@ -99,7 +99,8 @@ class OccupancyGridNode(Node):
         # SECOND time by Nav2's own inflation_layer downstream (the
         # aggregated grid is published as /manriix/obstacle_cloud, which
         # feeds the obstacle_layer 'oak_objects' observation source, and
-        # inflation_layer then applies inflation_radius=0.45 m on top).
+        # inflation_layer then applies its own inflation_radius on top --
+        # 0.55 m in the active nav2_params_carter.yaml as of this commit).
         # Nav2 already owns inflation; this node should only do what Nav2
         # has no equivalent for. Kept as a parameter (not deleted) so the
         # capability can be re-enabled with an override if ever wanted.

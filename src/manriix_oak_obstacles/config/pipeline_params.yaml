@@ -426,8 +426,9 @@ occupancy_grid_node:
 
     grid_size: 8.0          # [m]
     resolution: 0.05         # [m/cell]
-    # 0 = disabled. Nav2's inflation_layer (inflation_radius=0.45 m)
-    # already inflates the same obstacles after they arrive via
+    # 0 = disabled. Nav2's inflation_layer (inflation_radius=0.55 m in
+    # the active nav2_params_carter.yaml) already inflates the same
+    # obstacles after they arrive via
     # /manriix/obstacle_cloud; inflating here too was double-inflation.
     inflate_cells: 0
 
