@@ -246,8 +246,20 @@ class ClusterTrackingNode(Node):
         t = np.array([t.x, t.y, t.z])
         boxes = boxes_msg.boxes
 
-        refined = []
-        for centroid, pts in clusters:
+        # ---- Pass 1: cheap subsampled projection of EVERY cluster, to find
+        # each box's DOMINANT (most-overlapping-points) cluster first.
+        # A 2D box can visually overlap an unrelated background cluster
+        # purely from camera parallax (e.g. a person walking past, in
+        # front of a stationary chair, at a completely different real
+        # depth) -- BoundingBoxTrack.position can't disambiguate this
+        # (it's left at (0,0,0)/unavailable by the current detector
+        # publisher). Mirroring fusion_node's proven "most points inside
+        # wins" heuristic instead: a box may only influence the ONE
+        # cluster that dominates its overlap, not every cluster that
+        # merely brushes its pixel rectangle. ----
+        cluster_proj = []  # per-cluster: (valid, pix) or None
+        box_best = [(-1, 0) for _ in boxes]  # (winning cluster idx, count)
+        for ci, (centroid, pts) in enumerate(clusters):
             proj_pts = pts
             if pts.shape[0] > self.box_max_proj_points:
                 sel = np.random.choice(pts.shape[0], self.box_max_proj_points, replace=False)
@@ -257,29 +269,47 @@ class ClusterTrackingNode(Node):
             depth = pts_cam[:, 2]
             valid = depth > 1e-3
             if not np.any(valid):
-                refined.append((centroid, pts))
+                cluster_proj.append(None)
                 continue
             pix = np.full((proj_pts.shape[0], 2), np.nan)
             proj = (self.K @ pts_cam[valid].T).T
             pix[valid] = proj[:, :2] / proj[:, 2:3]
+            cluster_proj.append((valid, pix))
 
-            # Which box (if any) each *projected* point falls inside.
-            # -1 = none. Built on the (possibly subsampled) proj_pts, then
-            # applied back onto the FULL cluster below via a second pass
-            # (projection is cheap; re-running it on the full set only
-            # when we actually need to split keeps the common no-split
-            # case fast).
-            box_id_per_point = np.full(proj_pts.shape[0], -1, dtype=int)
-            counts = np.zeros(len(boxes), dtype=int)
             for bi, b in enumerate(boxes):
                 inside = (
                     valid &
                     (pix[:, 0] >= b.xmin) & (pix[:, 0] <= b.xmax) &
                     (pix[:, 1] >= b.ymin) & (pix[:, 1] <= b.ymax)
                 )
-                counts[bi] = int(inside.sum())
-                if counts[bi] >= self.box_min_points_in_box:
-                    box_id_per_point[inside] = bi
+                count = int(inside.sum())
+                if count > box_best[bi][1]:
+                    box_best[bi] = (ci, count)
+
+        refined = []
+        for ci, (centroid, pts) in enumerate(clusters):
+            proj = cluster_proj[ci]
+            if proj is None:
+                refined.append((centroid, pts))
+                continue
+            valid, pix = proj
+
+            # Which box (if any) each *projected* point falls inside.
+            # -1 = none. Only a box this cluster DOMINATES (per pass 1)
+            # may claim points from it. Applied back onto the FULL
+            # cluster below via a second pass (projection is cheap;
+            # re-running it on the full set only when we actually need
+            # to split keeps the common no-split case fast).
+            box_id_per_point = np.full(pix.shape[0], -1, dtype=int)
+            for bi, b in enumerate(boxes):
+                if box_best[bi][0] != ci or box_best[bi][1] < self.box_min_points_in_box:
+                    continue
+                inside = (
+                    valid &
+                    (pix[:, 0] >= b.xmin) & (pix[:, 0] <= b.xmax) &
+                    (pix[:, 1] >= b.ymin) & (pix[:, 1] <= b.ymax)
+                )
+                box_id_per_point[inside] = bi
 
             matched = sorted({b for b in box_id_per_point.tolist() if b >= 0})
 
