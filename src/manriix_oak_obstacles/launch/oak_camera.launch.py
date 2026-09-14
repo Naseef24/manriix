@@ -28,7 +28,14 @@ def generate_launch_description():
             name=[name, '_container'],
             namespace=namespace,
             package='rclcpp_components',
-            executable='component_container',
+            # MUST be the multi-threaded executor: depthai_ros_driver::Camera
+            # (bridging 3 onboard streams at up to 30Hz) and
+            # depth_image_proc::PointCloudXyzNode share this one container.
+            # With the single-threaded executor, PointCloudXyzNode's callback
+            # was starved behind the driver's own callbacks, collapsing
+            # /oak/points from the configured ~15Hz down to ~1Hz even though
+            # every upstream stream (stereo/rgb/nn) was running at full rate.
+            executable='component_container_mt',
             output='screen',
             arguments=['--ros-args', '--log-level', 'info'],
             composable_node_descriptions=[],
