@@ -178,8 +178,21 @@ class OccupancyGridNode(Node):
         shift = np.round((new_origin - self.origin_xy) / self.resolution).astype(int)
         if shift[0] == 0 and shift[1] == 0:
             return
-        rolled = np.zeros_like(self.static_conf)
         sx, sy = shift
+        if abs(sx) >= self.n_cells or abs(sy) >= self.n_cells:
+            # Jump bigger than the whole grid (e.g. a cuVSLAM relocalization
+            # discontinuity) -- old cells don't overlap the new window at
+            # all, so there's nothing to preserve. Re-center from empty
+            # instead of crashing on the slice arithmetic below, which
+            # assumes the shift is within grid bounds.
+            self.get_logger().warn(
+                f'grid: robot jumped {shift * self.resolution} m in one '
+                f'step (>= grid_size={self.grid_size}m) -- resetting static '
+                f'grid instead of rolling it')
+            self.static_conf = np.zeros_like(self.static_conf)
+            self.origin_xy = new_origin
+            return
+        rolled = np.zeros_like(self.static_conf)
         src_x = slice(max(0, sx), self.n_cells + min(0, sx))
         dst_x = slice(max(0, -sx), self.n_cells + min(0, -sx))
         src_y = slice(max(0, sy), self.n_cells + min(0, sy))

@@ -140,5 +140,6 @@ def generate_launch_description():
             name='occupancy_grid_node',
             output='screen',
             parameters=[params_file],
+            respawn=True,
         ),
     ])
