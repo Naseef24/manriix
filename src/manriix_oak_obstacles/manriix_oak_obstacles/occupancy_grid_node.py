@@ -94,7 +94,16 @@ class OccupancyGridNode(Node):
 
         self.declare_parameter('grid_size', 8.0)        # [m] side length
         self.declare_parameter('resolution', 0.05)       # [m/cell]
-        self.declare_parameter('inflate_cells', 2)       # simple obstacle inflation
+        # Obstacle inflation. DEFAULT 0 (= disabled, _inflate() is a
+        # no-op) ON PURPOSE: whatever this node inflates is inflated a
+        # SECOND time by Nav2's own inflation_layer downstream (the
+        # aggregated grid is published as /manriix/obstacle_cloud, which
+        # feeds the obstacle_layer 'oak_objects' observation source, and
+        # inflation_layer then applies inflation_radius=0.45 m on top).
+        # Nav2 already owns inflation; this node should only do what Nav2
+        # has no equivalent for. Kept as a parameter (not deleted) so the
+        # capability can be re-enabled with an override if ever wanted.
+        self.declare_parameter('inflate_cells', 0)       # simple obstacle inflation (0 = off)
 
         self.declare_parameter('predict_horizon', 1.0)   # [s] velocity sweep length
         self.declare_parameter('predict_steps', 5)        # sweep sub-steps
