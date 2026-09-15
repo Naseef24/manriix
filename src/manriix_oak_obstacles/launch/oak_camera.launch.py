@@ -28,14 +28,19 @@ def generate_launch_description():
             name=[name, '_container'],
             namespace=namespace,
             package='rclcpp_components',
-            # Reverted to the single-threaded executor to match the
-            # verified-good 2026-09-11 testing baseline. NOTE: with this
-            # executable, /oak/points was measured at ~1Hz instead of its
-            # configured ~15Hz (depthai_ros_driver::Camera and
-            # depth_image_proc::PointCloudXyzNode share this one container
-            # and its one thread) -- flagged here for whoever picks this
-            # back up, not yet re-addressed.
-            executable='component_container',
+            # Multi-threaded executor: the single-threaded
+            # 'component_container' starved depth_image_proc::PointCloudXyzNode
+            # behind depthai_ros_driver::Camera's own callback traffic in the
+            # same container/thread, capping /oak/points at ~1Hz instead of
+            # its configured ~15Hz. That throughput floor also broke
+            # static_dynamic_classifier_node's Sec III-D delta/tau timing
+            # (its 0.4s reference-frame lookback needs frames closer together
+            # than 1Hz provides), permanently stalling classification at
+            # 'uncertain'. Re-applied 2026-09-15 (previously verified live:
+            # ~1Hz -> ~30Hz on /oak/points, no shared-hardware-state risk
+            # found -- PointCloudXyzNode never touches the OAK device
+            # directly, only ROS topics) to unblock live re-verification.
+            executable='component_container_mt',
             output='screen',
             arguments=['--ros-args', '--log-level', 'info'],
             composable_node_descriptions=[],
